@@ -26,6 +26,7 @@ export default function SchedulesPage() {
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [formErrors, setFormErrors] = useState({})
 
   const teacherOptions = useMemo(
     () => teachers.map((teacher) => ({ id: teacher.id, name: `${teacher.last_name}, ${teacher.first_name}` })),
@@ -66,6 +67,33 @@ export default function SchedulesPage() {
     }
 
     setError('')
+    setFormErrors({})
+
+    const errs = {}
+    if (!scheduleForm.teacher_id) errs.teacher_id = 'Teacher is required'
+    if (scheduleForm.day_of_week === '' || scheduleForm.day_of_week === null || scheduleForm.day_of_week === undefined) {
+      errs.day_of_week = 'Day is required'
+    }
+    if (!scheduleForm.time_start) errs.time_start = 'Start time is required'
+    if (!scheduleForm.time_end) errs.time_end = 'End time is required'
+
+    const startMinutes = scheduleForm.time_start ? Number(scheduleForm.time_start.split(':')[0]) * 60 + Number(scheduleForm.time_start.split(':')[1]) : 0
+    const endMinutes = scheduleForm.time_end ? Number(scheduleForm.time_end.split(':')[0]) * 60 + Number(scheduleForm.time_end.split(':')[1]) : 0
+    if (scheduleForm.time_start && scheduleForm.time_end && endMinutes <= startMinutes) {
+      errs.time_end = 'End time must be after start time'
+    }
+
+    if (scheduleForm.grace_minutes === '' || Number.isNaN(Number(scheduleForm.grace_minutes))) {
+      errs.grace_minutes = 'Grace minutes is required'
+    } else if (Number(scheduleForm.grace_minutes) < 0) {
+      errs.grace_minutes = 'Grace minutes cannot be negative'
+    }
+
+    if (Object.keys(errs).length) {
+      setFormErrors(errs)
+      return
+    }
+
     setLoading(true)
     try {
       const path = editScheduleId ? `/schedules/${editScheduleId}` : '/schedules'
@@ -86,6 +114,7 @@ export default function SchedulesPage() {
       setScheduleForm(emptySchedule)
       setEditScheduleId(null)
       setFormOpen(false)
+      setFormErrors({})
       await loadData()
     } catch (err) {
       setError(err.message)
@@ -202,6 +231,9 @@ export default function SchedulesPage() {
         busy={loading}
       >
         <div className="grid gap-4">
+          {Object.keys(formErrors).length ? (
+            <p className="text-sm text-red-600">Please fix the highlighted fields.</p>
+          ) : null}
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Teacher
             <select
@@ -216,6 +248,9 @@ export default function SchedulesPage() {
                 </option>
               ))}
             </select>
+            {formErrors.teacher_id ? (
+              <span className="text-xs text-red-600">{formErrors.teacher_id}</span>
+            ) : null}
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Day
@@ -230,6 +265,9 @@ export default function SchedulesPage() {
                 </option>
               ))}
             </select>
+            {formErrors.day_of_week ? (
+              <span className="text-xs text-red-600">{formErrors.day_of_week}</span>
+            ) : null}
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Start
@@ -239,6 +277,9 @@ export default function SchedulesPage() {
               value={scheduleForm.time_start}
               onChange={(event) => setScheduleForm((prev) => ({ ...prev, time_start: event.target.value }))}
             />
+            {formErrors.time_start ? (
+              <span className="text-xs text-red-600">{formErrors.time_start}</span>
+            ) : null}
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             End
@@ -248,6 +289,9 @@ export default function SchedulesPage() {
               value={scheduleForm.time_end}
               onChange={(event) => setScheduleForm((prev) => ({ ...prev, time_end: event.target.value }))}
             />
+            {formErrors.time_end ? (
+              <span className="text-xs text-red-600">{formErrors.time_end}</span>
+            ) : null}
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Grace Minutes
@@ -258,6 +302,9 @@ export default function SchedulesPage() {
               value={scheduleForm.grace_minutes}
               onChange={(event) => setScheduleForm((prev) => ({ ...prev, grace_minutes: event.target.value }))}
             />
+            {formErrors.grace_minutes ? (
+              <span className="text-xs text-red-600">{formErrors.grace_minutes}</span>
+            ) : null}
           </label>
         </div>
       </Modal>

@@ -6,7 +6,8 @@ import Icon from '../components/ui/Icon'
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth()
-  const [form, setForm] = useState({ username: 'admin', password: 'admin123' })
+  const [form, setForm] = useState({ username: '', password: '' })
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -71,12 +72,20 @@ export default function LoginPage() {
                 <Icon name="lock" className="w-4 h-4" />
               </span>
               <input
-                className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                type="password"
+                className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
                 value={form.password}
                 onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
               />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                onClick={() => setShowPassword((prev) => !prev)}
+                tabIndex={-1}
+              >
+                <Icon name={showPassword ? 'eye-off' : 'eye'} className="w-4 h-4" />
+              </button>
             </div>
           </div>
 

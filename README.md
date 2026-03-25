@@ -193,8 +193,8 @@ This project now includes a Node.js + Express backend for Phase 1:
 
 ### Environment Setup
 
-1. Copy `server/.env.example` to `.env` at the project root.
-2. Update MySQL values (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`).
+1. Create a `.env` file at the project root.
+2. Add the required values: `PORT`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`.
 3. Set `JWT_SECRET` to a secure value.
 
 ### Useful Commands

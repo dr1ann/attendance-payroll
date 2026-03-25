@@ -16,6 +16,24 @@ schedulesRouter.get('/', authorizeRoles('admin', 'payroll_viewer'), async (_, re
   res.json(rows)
 })
 
+schedulesRouter.get('/my', authorizeRoles('teacher'), async (req, res) => {
+  const teacherId = req.user.teacher_id
+
+  if (!teacherId) {
+    return res.status(400).json({ message: 'No teacher profile linked to this account' })
+  }
+
+  const rows = await query(
+    `SELECT s.id, s.day_of_week, s.time_start, s.time_end, s.grace_minutes
+     FROM schedules s
+     WHERE s.teacher_id = ?
+     ORDER BY s.day_of_week`,
+    [teacherId],
+  )
+
+  res.json(rows)
+})
+
 schedulesRouter.post('/', authorizeRoles('admin'), async (req, res) => {
   const { teacher_id, day_of_week, time_start, time_end, grace_minutes } = req.body
 

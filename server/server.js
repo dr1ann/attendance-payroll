@@ -3,8 +3,8 @@ import cors from 'cors'
 import { authRouter } from './routes/auth.js'
 import { teachersRouter } from './routes/teachers.js'
 import { schedulesRouter } from './routes/schedules.js'
-import { calendarRouter } from './routes/calendar.js'
 import { settingsRouter } from './routes/settings.js'
+import { attendanceRouter } from './routes/attendance.js'
 import { authenticateToken } from './middleware/auth.js'
 
 const app = express()
@@ -20,8 +20,8 @@ app.get('/api/health', (_, res) => {
 app.use('/api/auth', authRouter)
 app.use('/api/teachers', authenticateToken, teachersRouter)
 app.use('/api/schedules', authenticateToken, schedulesRouter)
-app.use('/api/calendar', authenticateToken, calendarRouter)
 app.use('/api/settings', authenticateToken, settingsRouter)
+app.use('/api/attendance', authenticateToken, attendanceRouter)
 
 app.use((err, _, res, next) => {
   void next
