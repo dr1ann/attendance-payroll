@@ -62,10 +62,60 @@ async function init() {
       first_name VARCHAR(100) NOT NULL,
       last_name VARCHAR(100) NOT NULL,
       department VARCHAR(100) NOT NULL,
+      teacher_type ENUM('full_time', 'part_time') NOT NULL DEFAULT 'full_time',
+      monthly_salary DECIMAL(10,2) NOT NULL DEFAULT 0,
+      session_rate DECIMAL(10,2) NOT NULL DEFAULT 0,
       hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0,
       status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
+  `)
+
+  const [teacherTypeCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'teachers' AND COLUMN_NAME = 'teacher_type'`,
+    [dbName],
+  )
+
+  if (teacherTypeCols.length === 0) {
+    await connection.query(`
+      ALTER TABLE teachers
+      ADD COLUMN teacher_type ENUM('full_time', 'part_time') NOT NULL DEFAULT 'full_time'
+      AFTER department
+    `)
+  }
+
+  const [monthlySalaryCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'teachers' AND COLUMN_NAME = 'monthly_salary'`,
+    [dbName],
+  )
+
+  if (monthlySalaryCols.length === 0) {
+    await connection.query(`
+      ALTER TABLE teachers
+      ADD COLUMN monthly_salary DECIMAL(10,2) NOT NULL DEFAULT 0
+      AFTER teacher_type
+    `)
+  }
+
+  const [sessionRateCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'teachers' AND COLUMN_NAME = 'session_rate'`,
+    [dbName],
+  )
+
+  if (sessionRateCols.length === 0) {
+    await connection.query(`
+      ALTER TABLE teachers
+      ADD COLUMN session_rate DECIMAL(10,2) NOT NULL DEFAULT 0
+      AFTER monthly_salary
+    `)
+  }
+
+  await connection.query(`
+    ALTER TABLE teachers
+    MODIFY COLUMN teacher_type ENUM('full_time', 'part_time') NOT NULL DEFAULT 'full_time'
   `)
 
   await connection.query(`
@@ -87,13 +137,50 @@ async function init() {
       id INT PRIMARY KEY,
       late_grace_minutes INT NOT NULL DEFAULT 15,
       duplicate_scan_window_minutes INT NOT NULL DEFAULT 5,
+      late_deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+      absence_deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
       timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Manila'
     )
   `)
 
+  const [lateDeductionCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_settings' AND COLUMN_NAME = 'late_deduction_amount'`,
+    [dbName],
+  )
+
+  if (lateDeductionCols.length === 0) {
+    await connection.query(`
+      ALTER TABLE attendance_settings
+      ADD COLUMN late_deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0
+      AFTER duplicate_scan_window_minutes
+    `)
+  }
+
+  const [absenceDeductionCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_settings' AND COLUMN_NAME = 'absence_deduction_amount'`,
+    [dbName],
+  )
+
+  if (absenceDeductionCols.length === 0) {
+    await connection.query(`
+      ALTER TABLE attendance_settings
+      ADD COLUMN absence_deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0
+      AFTER late_deduction_amount
+    `)
+  }
+
   await connection.query(
-    `INSERT IGNORE INTO attendance_settings (id, late_grace_minutes, duplicate_scan_window_minutes, timezone)
-     VALUES (1, 15, 5, 'Asia/Manila')`,
+    `INSERT IGNORE INTO attendance_settings (
+      id,
+      late_grace_minutes,
+      duplicate_scan_window_minutes,
+      late_deduction_amount,
+      absence_deduction_amount,
+      timezone
+    )
+     VALUES (1, 15, 5, 0, 0, 'Asia/Manila')`,
   )
 
   await connection.query(`

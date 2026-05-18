@@ -7,6 +7,8 @@ import Icon from '../components/ui/Icon'
 const defaults = {
   late_grace_minutes: 15,
   duplicate_scan_window_minutes: 5,
+  late_deduction_amount: 0,
+  absence_deduction_amount: 0,
   timezone: 'Asia/Manila',
 }
 
@@ -40,6 +42,8 @@ export default function SettingsPage() {
             ...settings,
             late_grace_minutes: Number(settings.late_grace_minutes),
             duplicate_scan_window_minutes: Number(settings.duplicate_scan_window_minutes),
+            late_deduction_amount: Number(settings.late_deduction_amount),
+            absence_deduction_amount: Number(settings.absence_deduction_amount),
           }),
         },
         token,
@@ -82,6 +86,34 @@ export default function SettingsPage() {
                 value={settings.duplicate_scan_window_minutes}
                 onChange={(event) =>
                   setSettings((prev) => ({ ...prev, duplicate_scan_window_minutes: event.target.value }))
+                }
+                disabled={!isAdmin}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+              Late Deduction Amount
+              <input
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                type="number"
+                min="0"
+                step="0.01"
+                value={settings.late_deduction_amount}
+                onChange={(event) =>
+                  setSettings((prev) => ({ ...prev, late_deduction_amount: event.target.value }))
+                }
+                disabled={!isAdmin}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+              Absence Deduction Amount
+              <input
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                type="number"
+                min="0"
+                step="0.01"
+                value={settings.absence_deduction_amount}
+                onChange={(event) =>
+                  setSettings((prev) => ({ ...prev, absence_deduction_amount: event.target.value }))
                 }
                 disabled={!isAdmin}
               />

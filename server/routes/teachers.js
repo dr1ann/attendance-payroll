@@ -4,12 +4,53 @@ import { authorizeRoles } from '../middleware/auth.js'
 
 export const teachersRouter = Router()
 
+function validateTeacherPayload(payload) {
+  const {
+    employee_no,
+    first_name,
+    last_name,
+    department,
+    teacher_type,
+    monthly_salary,
+    session_rate,
+  } = payload
+
+  if (!employee_no || !first_name || !last_name || !department) {
+    return 'Missing required fields'
+  }
+
+  if (!['full_time', 'part_time'].includes(teacher_type)) {
+    return 'Teacher type must be either full_time or part_time'
+  }
+
+  if (teacher_type === 'full_time') {
+    if (monthly_salary === '' || Number.isNaN(Number(monthly_salary))) {
+      return 'Monthly salary is required for full-time teachers'
+    }
+    if (Number(monthly_salary) < 0) {
+      return 'Monthly salary cannot be negative'
+    }
+  }
+
+  if (teacher_type === 'part_time') {
+    if (session_rate === '' || Number.isNaN(Number(session_rate))) {
+      return 'Session rate is required for part-time teachers'
+    }
+    if (Number(session_rate) < 0) {
+      return 'Session rate cannot be negative'
+    }
+  }
+
+  return null
+}
+
 teachersRouter.get('/', authorizeRoles('admin', 'payroll_viewer'), async (req, res) => {
   const search = req.query.q?.trim()
 
   const rows = search
     ? await query(
         `SELECT t.id, t.employee_no, t.first_name, t.last_name, t.department, t.hourly_rate, t.status, t.created_at,
+          t.teacher_type, t.monthly_salary, t.session_rate,
                 u.id AS user_id, u.username AS account_username
          FROM teachers t
          LEFT JOIN users u ON u.teacher_id = t.id AND u.role = 'teacher'
@@ -19,6 +60,7 @@ teachersRouter.get('/', authorizeRoles('admin', 'payroll_viewer'), async (req, r
       )
     : await query(
         `SELECT t.id, t.employee_no, t.first_name, t.last_name, t.department, t.hourly_rate, t.status, t.created_at,
+          t.teacher_type, t.monthly_salary, t.session_rate,
                 u.id AS user_id, u.username AS account_username
          FROM teachers t
          LEFT JOIN users u ON u.teacher_id = t.id AND u.role = 'teacher'
@@ -43,7 +85,8 @@ teachersRouter.get('/me', authorizeRoles('teacher'), async (req, res) => {
   }
 
   const rows = await query(
-    `SELECT t.id, t.employee_no, t.first_name, t.last_name, t.department, t.hourly_rate, t.status, t.created_at,
+      `SELECT t.id, t.employee_no, t.first_name, t.last_name, t.department, t.hourly_rate, t.status, t.created_at,
+        t.teacher_type, t.monthly_salary, t.session_rate,
             u.id AS user_id, u.username AS account_username
      FROM teachers t
      LEFT JOIN users u ON u.teacher_id = t.id AND u.role = 'teacher'
@@ -69,18 +112,39 @@ teachersRouter.get('/me', authorizeRoles('teacher'), async (req, res) => {
 })
 
 teachersRouter.post('/', authorizeRoles('admin'), async (req, res) => {
-  const { employee_no, first_name, last_name, department, hourly_rate, status } = req.body
+  const {
+    employee_no,
+    first_name,
+    last_name,
+    department,
+    teacher_type,
+    monthly_salary,
+    session_rate,
+    hourly_rate,
+    status,
+  } = req.body
 
-  if (!employee_no || !first_name || !last_name || !department) {
-    return res.status(400).json({ message: 'Missing required fields' })
+  const validationMessage = validateTeacherPayload(req.body)
+  if (validationMessage) {
+    return res.status(400).json({ message: validationMessage })
   }
 
   try {
     await query(
-      `INSERT INTO teachers (employee_no, first_name, last_name, department, hourly_rate, status)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO teachers (employee_no, first_name, last_name, department, teacher_type, monthly_salary, session_rate, hourly_rate, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ,
-      [employee_no, first_name, last_name, department, hourly_rate ?? 0, status || 'active'],
+      [
+        employee_no,
+        first_name,
+        last_name,
+        department,
+        teacher_type,
+        teacher_type === 'full_time' ? Number(monthly_salary || 0) : 0,
+        teacher_type === 'part_time' ? Number(session_rate || 0) : 0,
+        hourly_rate ?? 0,
+        status || 'active',
+      ],
     )
   } catch (err) {
     if (err?.code === 'ER_DUP_ENTRY') {
@@ -93,22 +157,37 @@ teachersRouter.post('/', authorizeRoles('admin'), async (req, res) => {
 })
 
 teachersRouter.put('/:id', authorizeRoles('admin'), async (req, res) => {
-  const { employee_no, first_name, last_name, department, hourly_rate, status } = req.body
+  const {
+    employee_no,
+    first_name,
+    last_name,
+    department,
+    teacher_type,
+    monthly_salary,
+    session_rate,
+    hourly_rate,
+    status,
+  } = req.body
 
-  if (!employee_no || !first_name || !last_name || !department) {
-    return res.status(400).json({ message: 'Missing required fields' })
+  const validationMessage = validateTeacherPayload(req.body)
+  if (validationMessage) {
+    return res.status(400).json({ message: validationMessage })
   }
 
   try {
     const result = await query(
       `UPDATE teachers
-       SET employee_no = ?, first_name = ?, last_name = ?, department = ?, hourly_rate = ?, status = ?
+       SET employee_no = ?, first_name = ?, last_name = ?, department = ?, teacher_type = ?,
+           monthly_salary = ?, session_rate = ?, hourly_rate = ?, status = ?
        WHERE id = ?`,
       [
         employee_no,
         first_name,
         last_name,
         department,
+        teacher_type,
+        teacher_type === 'full_time' ? Number(monthly_salary || 0) : 0,
+        teacher_type === 'part_time' ? Number(session_rate || 0) : 0,
         hourly_rate ?? 0,
         status || 'active',
         req.params.id,

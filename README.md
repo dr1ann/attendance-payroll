@@ -7,6 +7,17 @@ A simple school system project for STI College Ormoc to:
 
 This project is intentionally minimal and practical for an individual capstone/class requirement.
 
+## Current Implementation Status
+
+The system now has working backend and frontend modules for:
+
+- JWT authentication with role-based access.
+- Teacher CRUD with required type (`full_time` or `part_time`).
+- Schedule CRUD.
+- QR attendance scan flow with duplicate scan protection.
+- Attendance settings management.
+- Payroll summary API with type-based salary calculation.
+
 ## Project Scope (Simple MVP)
 
 ### Included
@@ -63,7 +74,8 @@ This project is intentionally minimal and practical for an individual capstone/c
 - `id` (PK)
 - `username`
 - `password_hash`
-- `role` (`admin`, `payroll_viewer`)
+- `role` (`admin`, `payroll_viewer`, `teacher`)
+- `teacher_id` (nullable FK reference by convention)
 - `created_at`
 
 ### `teachers`
@@ -73,9 +85,11 @@ This project is intentionally minimal and practical for an individual capstone/c
 - `first_name`
 - `last_name`
 - `department`
-- `hourly_rate` (or `daily_rate`)
+- `teacher_type` (`full_time`, `part_time`)
+- `monthly_salary`
+- `session_rate`
+- `hourly_rate` (legacy field, still present)
 - `status` (`active`, `inactive`)
-- `qr_token` (unique)
 - `created_at`
 
 ### `schedules`
@@ -87,46 +101,38 @@ This project is intentionally minimal and practical for an individual capstone/c
 - `time_end`
 - `grace_minutes`
 
-### `attendance_logs`
+### `attendance`
 
 - `id` (PK)
 - `teacher_id` (FK → teachers.id)
-- `scan_type` (`in`, `out`)
+- `schedule_id` (FK → schedules.id, nullable)
 - `scan_time`
-- `remarks` (`present`, `late`, `incomplete`, `manual_adjusted`)
-- `source` (`qr`, `manual`)
-- `approved_by` (FK → users.id, nullable)
+- `scan_type` (`time_in`, `time_out`)
+- `status` (`on_time`, `late`)
 - `created_at`
 
-### `payroll_cutoffs`
+### `attendance_settings`
 
-- `id` (PK)
-- `date_from`
-- `date_to`
-- `status` (`draft`, `finalized`)
-- `created_by` (FK → users.id)
-- `created_at`
+- `id` (singleton = 1)
+- `late_grace_minutes`
+- `duplicate_scan_window_minutes`
+- `late_deduction_amount`
+- `absence_deduction_amount`
+- `timezone`
 
-### `payroll_entries`
-
-- `id` (PK)
-- `cutoff_id` (FK → payroll_cutoffs.id)
-- `teacher_id` (FK → teachers.id)
-- `approved_hours`
-- `late_count`
-- `gross_pay`
-- `deductions`
-- `net_pay`
-- `updated_at`
-
-## Basic Payroll Rules (MVP)
+## Basic Payroll Rules (Current)
 
 - `Present`: valid Time In and Time Out on a scheduled day.
 - `Late`: Time In beyond schedule start + grace minutes.
-- `Incomplete`: missing Time In or Time Out (excluded until corrected).
-- Payroll formula:
-	- `gross_pay = approved_hours * hourly_rate`
-	- `net_pay = gross_pay - deductions`
+- `Absence`: expected schedule session with no complete attendance pair.
+- Overtime: disabled for now.
+- Payroll formulas:
+	- Full-time: `gross_pay = monthly_salary`
+	- Part-time: `gross_pay = attended_sessions * session_rate`
+	- Deductions (both types):
+		- `late_deduction_total = late_count * late_deduction_amount`
+		- `absence_deduction_total = absence_count * absence_deduction_amount`
+	- `net_pay = max(0, gross_pay - late_deduction_total - absence_deduction_total)`
 
 ## QR Attendance Flow
 
@@ -185,11 +191,22 @@ npm run dev:full
 This project now includes a Node.js + Express backend for Phase 1:
 
 - Token-based authentication (JWT)
-- Role access (`admin`, `payroll_viewer`)
-- Teacher masterlist CRUD
+- Role access (`admin`, `payroll_viewer`, `teacher`)
+- Teacher masterlist CRUD with type-specific compensation fields
 - Schedule CRUD
-- School calendar CRUD
-- Attendance settings (singleton)
+- Attendance scan and logs
+- Attendance settings (singleton) including payroll deduction amounts
+- Payroll summary and teacher breakdown APIs
+
+### Current API Modules
+
+- `/api/auth` - login, profile, account management
+- `/api/teachers` - teacher CRUD and teacher profile
+- `/api/schedules` - schedule CRUD and teacher schedule view
+- `/api/attendance` - scan flow and attendance logs
+- `/api/settings/attendance` - attendance and deduction configuration
+- `/api/payroll/summary` - payroll results by period
+- `/api/payroll/teacher/:id/breakdown` - per-teacher attendance breakdown by period
 
 ### Environment Setup
 

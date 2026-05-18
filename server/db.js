@@ -10,11 +10,11 @@ const envPath = path.resolve(__dirname, '..', '.env')
 dotenv.config({ path: envPath })
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'attendance_payroll',
-  port: Number(process.env.DB_PORT || 3306),
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: Number(process.env.DB_PORT),
   waitForConnections: true,
   connectionLimit: 10,
 })

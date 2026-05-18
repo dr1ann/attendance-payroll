@@ -23,10 +23,11 @@ This file is a quick reference for developers who need to modify this system.
 - `server/server.js`: app setup, middleware, route registration.
 - `server/db.js`: MySQL pool and query helper.
 - `server/routes/auth.js`: login, profile, password endpoints.
-- `server/routes/teachers.js`: teacher CRUD endpoints.
+- `server/routes/teachers.js`: teacher CRUD endpoints and type-specific payload validation.
 - `server/routes/schedules.js`: schedule CRUD endpoints.
-- `server/routes/settings.js`: attendance settings endpoints.
+- `server/routes/settings.js`: attendance + payroll deduction settings endpoints.
 - `server/routes/attendance.js`: attendance scan/log endpoints.
+- `server/routes/payroll.js`: payroll summary and per-teacher breakdown endpoints.
 - `server/middleware/auth.js`: JWT auth and role authorization.
 
 ### Database bootstrap
@@ -63,10 +64,20 @@ File: `server/scripts/initDb.js`
 2. Connect to MySQL using host/user/password/port env values.
 3. `CREATE DATABASE IF NOT EXISTS` and `USE` that DB.
 4. Create `users`, `teachers`, `schedules`, `attendance_settings`, `attendance` tables.
-5. Run migration-safe updates (example: make sure `teacher_id` exists in `users`).
+5. Run migration-safe updates (examples below).
 6. Insert singleton default settings row (`attendance_settings.id = 1`) with `INSERT IGNORE`.
 7. Seed admin user using upsert logic.
 8. Close connection.
+
+### Current migration-safe checks in `initDb.js`
+
+- Ensure `users.role` enum supports `teacher`.
+- Ensure `users.teacher_id` exists.
+- Ensure `teachers.teacher_type` exists and enum is (`full_time`, `part_time`).
+- Ensure `teachers.monthly_salary` exists.
+- Ensure `teachers.session_rate` exists.
+- Ensure `attendance_settings.late_deduction_amount` exists.
+- Ensure `attendance_settings.absence_deduction_amount` exists.
 
 ## 6) How default admin account is populated
 
@@ -123,7 +134,47 @@ Use this guide:
 - Change default admin seed behavior: `server/scripts/initDb.js`
 - Change auth guards and roles: `server/middleware/auth.js`
 
-## 10) Notes for future maintainers
+## 10) Payroll and teacher type implementation
+
+### Teacher payload contract (`server/routes/teachers.js`)
+
+Required base fields:
+
+- `employee_no`
+- `first_name`
+- `last_name`
+- `department`
+- `teacher_type` must be exactly `full_time` or `part_time`
+
+Conditional required fields:
+
+- If `teacher_type = full_time`, require non-negative `monthly_salary`
+- If `teacher_type = part_time`, require non-negative `session_rate`
+
+The API stores only the relevant compensation field for each type and zeroes the other field.
+
+### Payroll endpoints (`server/routes/payroll.js`)
+
+- `GET /api/payroll/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+- `GET /api/payroll/teacher/:id/breakdown?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+
+### Calculation rules currently implemented
+
+- Full-time gross pay: `monthly_salary`
+- Part-time gross pay: `session_rate * attended_sessions`
+- Late deduction: `late_count * attendance_settings.late_deduction_amount`
+- Absence deduction: `absence_count * attendance_settings.absence_deduction_amount`
+- Net pay: `max(0, gross - late_deduction - absence_deduction)`
+- Overtime: not included
+
+### Attendance metrics used by payroll
+
+- `attended_sessions`: day has both `time_in` and `time_out`
+- `late_count`: count of `time_in` rows marked `late`
+- `expected_sessions`: based on scheduled day-of-week entries in range
+- `absence_count`: `max(0, expected_sessions - attended_sessions)`
+
+## 11) Notes for future maintainers
 
 - Keep `initDb.js` idempotent: it should be safe to run many times.
 - Prefer additive migrations (check then alter) to avoid breaking existing data.

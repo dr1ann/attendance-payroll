@@ -12,7 +12,9 @@ const emptyTeacher = {
   first_name: '',
   last_name: '',
   department: '',
-  hourly_rate: 0,
+  teacher_type: 'full_time',
+  monthly_salary: 0,
+  session_rate: 0,
   status: 'active',
 }
 
@@ -100,10 +102,22 @@ export default function TeachersPage() {
     if (!teacherForm.first_name.trim()) errs.first_name = 'First name is required'
     if (!teacherForm.last_name.trim()) errs.last_name = 'Last name is required'
     if (!teacherForm.department.trim()) errs.department = 'Department is required'
-    if (teacherForm.hourly_rate === '' || Number.isNaN(Number(teacherForm.hourly_rate))) {
-      errs.hourly_rate = 'Hourly rate is required'
-    } else if (Number(teacherForm.hourly_rate) < 0) {
-      errs.hourly_rate = 'Hourly rate cannot be negative'
+    if (!['full_time', 'part_time'].includes(teacherForm.teacher_type)) {
+      errs.teacher_type = 'Teacher type is required'
+    }
+    if (teacherForm.teacher_type === 'full_time') {
+      if (teacherForm.monthly_salary === '' || Number.isNaN(Number(teacherForm.monthly_salary))) {
+        errs.monthly_salary = 'Monthly salary is required for full-time teachers'
+      } else if (Number(teacherForm.monthly_salary) < 0) {
+        errs.monthly_salary = 'Monthly salary cannot be negative'
+      }
+    }
+    if (teacherForm.teacher_type === 'part_time') {
+      if (teacherForm.session_rate === '' || Number.isNaN(Number(teacherForm.session_rate))) {
+        errs.session_rate = 'Session rate is required for part-time teachers'
+      } else if (Number(teacherForm.session_rate) < 0) {
+        errs.session_rate = 'Session rate cannot be negative'
+      }
     }
 
     if (Object.keys(errs).length) {
@@ -120,7 +134,8 @@ export default function TeachersPage() {
           method: editTeacherId ? 'PUT' : 'POST',
           body: JSON.stringify({
             ...teacherForm,
-            hourly_rate: Number(teacherForm.hourly_rate || 0),
+            monthly_salary: Number(teacherForm.monthly_salary || 0),
+            session_rate: Number(teacherForm.session_rate || 0),
           }),
         },
         token,
@@ -296,7 +311,8 @@ export default function TeachersPage() {
               <th className="px-4 py-3 text-left font-medium text-gray-600">Employee No</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Department</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Hourly Rate</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600">Type</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600">Compensation</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Account</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">QR</th>
@@ -314,7 +330,16 @@ export default function TeachersPage() {
                 <td className="px-4 py-3">{teacher.employee_no}</td>
                 <td className="px-4 py-3">{teacher.last_name}, {teacher.first_name}</td>
                 <td className="px-4 py-3">{teacher.department}</td>
-                <td className="px-4 py-3">₱{Number(teacher.hourly_rate).toFixed(2)}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${teacher.teacher_type === 'part_time' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                    {teacher.teacher_type === 'part_time' ? 'part_time' : 'full_time'}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  {teacher.teacher_type === 'part_time'
+                    ? `₱${Number(teacher.session_rate).toFixed(2)} / session`
+                    : `₱${Number(teacher.monthly_salary).toFixed(2)} / month`}
+                </td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-1 rounded text-xs font-medium ${teacher.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{teacher.status}</span>
                 </td>
@@ -367,7 +392,9 @@ export default function TeachersPage() {
                           first_name: teacher.first_name,
                           last_name: teacher.last_name,
                           department: teacher.department,
-                          hourly_rate: teacher.hourly_rate,
+                          teacher_type: teacher.teacher_type || 'full_time',
+                          monthly_salary: teacher.monthly_salary ?? 0,
+                          session_rate: teacher.session_rate ?? 0,
                           status: teacher.status,
                         })
                         setFormOpen(true)
@@ -444,19 +471,60 @@ export default function TeachersPage() {
             ) : null}
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-            Hourly Rate
-            <input
+            Teacher Type
+            <select
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              type="number"
-              min="0"
-              step="0.01"
-              value={teacherForm.hourly_rate}
-              onChange={(event) => setTeacherForm((prev) => ({ ...prev, hourly_rate: event.target.value }))}
-            />
-            {teacherFormErrors.hourly_rate ? (
-              <span className="text-xs text-red-600">{teacherFormErrors.hourly_rate}</span>
+              value={teacherForm.teacher_type}
+              onChange={(event) =>
+                setTeacherForm((prev) => ({
+                  ...prev,
+                  teacher_type: event.target.value,
+                }))
+              }
+            >
+              <option value="full_time">Full Time</option>
+              <option value="part_time">Part Time</option>
+            </select>
+            {teacherFormErrors.teacher_type ? (
+              <span className="text-xs text-red-600">{teacherFormErrors.teacher_type}</span>
             ) : null}
           </label>
+          {teacherForm.teacher_type === 'full_time' ? (
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+              Monthly Salary
+              <input
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="number"
+                min="0"
+                step="0.01"
+                value={teacherForm.monthly_salary}
+                onChange={(event) =>
+                  setTeacherForm((prev) => ({ ...prev, monthly_salary: event.target.value }))
+                }
+              />
+              {teacherFormErrors.monthly_salary ? (
+                <span className="text-xs text-red-600">{teacherFormErrors.monthly_salary}</span>
+              ) : null}
+            </label>
+          ) : null}
+          {teacherForm.teacher_type === 'part_time' ? (
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+              Session Rate
+              <input
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="number"
+                min="0"
+                step="0.01"
+                value={teacherForm.session_rate}
+                onChange={(event) =>
+                  setTeacherForm((prev) => ({ ...prev, session_rate: event.target.value }))
+                }
+              />
+              {teacherFormErrors.session_rate ? (
+                <span className="text-xs text-red-600">{teacherFormErrors.session_rate}</span>
+              ) : null}
+            </label>
+          ) : null}
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Status
             <select
@@ -464,8 +532,8 @@ export default function TeachersPage() {
               value={teacherForm.status}
               onChange={(event) => setTeacherForm((prev) => ({ ...prev, status: event.target.value }))}
             >
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
           </label>
         </div>
