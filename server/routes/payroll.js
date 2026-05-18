@@ -94,7 +94,10 @@ function computePayrollForTeacher(teacher, periodStats, settings) {
       ? Number(teacher.monthly_salary || 0)
       : Number(teacher.session_rate || 0) * periodStats.attendedSessions
 
-  const lateDeduction = periodStats.lateCount * Number(settings.late_deduction_amount || 0)
+  const lateDeduction =
+    teacher.teacher_type === 'full_time'
+      ? periodStats.lateCount * Number(settings.late_deduction_amount || 0)
+      : 0
   const absenceDeduction = periodStats.absenceCount * Number(settings.absence_deduction_amount || 0)
   const totalDeductions = lateDeduction + absenceDeduction
   const netPay = Math.max(0, grossPay - totalDeductions)
@@ -212,7 +215,7 @@ payrollRouter.get('/summary', authorizeRoles('admin', 'payroll_viewer'), async (
       formula:
         teacher.teacher_type === 'full_time'
           ? 'gross = monthly_salary; net = gross - (late_count * late_deduction) - (absence_count * absence_deduction)'
-          : 'gross = session_rate * attended_sessions; net = gross - (late_count * late_deduction) - (absence_count * absence_deduction)',
+          : 'gross = session_rate * attended_sessions; net = gross - (absence_count * absence_deduction)',
     }
   })
 

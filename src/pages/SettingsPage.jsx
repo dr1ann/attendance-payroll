@@ -60,6 +60,9 @@ export default function SettingsPage() {
     <section>
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Attendance Settings</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Full-time teachers are marked late immediately after the scheduled start. Part-time teachers do not incur late deductions.
+        </p>
       </div>
       <div className="max-w-lg mx-auto">
         <div className="bg-white rounded-lg border border-gray-200 p-6">

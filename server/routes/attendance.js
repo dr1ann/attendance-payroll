@@ -96,7 +96,7 @@ attendanceRouter.get('/today-schedules', authorizeRoles('admin'), async (req, re
   const { timezone, todayDate, dayOfWeek } = context
 
   const [teacher] = await query(
-    'SELECT id, first_name, last_name, status FROM teachers WHERE employee_no = ?',
+    'SELECT id, first_name, last_name, status, teacher_type FROM teachers WHERE employee_no = ?',
     [employee_no],
   )
 
@@ -141,7 +141,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
 
   // Find the teacher
   const [teacher] = await query(
-    'SELECT id, first_name, last_name, status FROM teachers WHERE employee_no = ?',
+    'SELECT id, first_name, last_name, status, teacher_type FROM teachers WHERE employee_no = ?',
     [employee_no],
   )
 
@@ -228,7 +228,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
   if (scanType === 'time_in' && schedule) {
     const currentMinutes = timeToMinutes(currentTime)
     const scheduleStartMinutes = timeToMinutes(schedule.time_start)
-    const graceMinutes = schedule.grace_minutes
+    const graceMinutes = teacher.teacher_type === 'full_time' ? 0 : Number(schedule.grace_minutes || 0)
 
     if (currentMinutes > scheduleStartMinutes + graceMinutes) {
       status = 'late'
