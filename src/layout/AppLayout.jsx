@@ -11,14 +11,17 @@ const adminNav = [
   { label: 'Dashboard', to: '/', icon: 'dashboard' },
   { label: 'Scan QR', to: '/scan', icon: 'qr-scan' },
   { label: 'Attendance', to: '/attendance', icon: 'history' },
+  { label: 'Salary Computation', to: '/salary-computation', icon: 'calendar' },
   { label: 'Teachers', to: '/teachers', icon: 'users' },
+  { label: 'Departments', to: '/departments', icon: 'users' },
   { label: 'Schedules', to: '/schedules', icon: 'clock' },
   { label: 'Settings', to: '/settings', icon: 'settings' },
 ]
 
-const payrollViewerNav = [
+const salaryViewerNav = [
   { label: 'Dashboard', to: '/', icon: 'dashboard' },
   { label: 'Attendance', to: '/attendance', icon: 'history' },
+  { label: 'Salary Computation', to: '/salary-computation', icon: 'calendar' },
   { label: 'Teachers', to: '/teachers', icon: 'users' },
   { label: 'Schedules', to: '/schedules', icon: 'clock' },
   { label: 'Settings', to: '/settings', icon: 'settings' },
@@ -30,7 +33,7 @@ const teacherNav = [
 
 function getNavItems(role) {
   if (role === 'teacher') return teacherNav
-  if (role === 'payroll_viewer') return payrollViewerNav
+  if (role === 'salary_viewer') return salaryViewerNav
   return adminNav
 }
 

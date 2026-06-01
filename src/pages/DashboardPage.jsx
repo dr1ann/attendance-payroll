@@ -5,18 +5,19 @@ const cards = [
   { title: 'Scan QR', description: 'Scan teacher attendance via QR code.', to: '/scan', metric: 'Attendance' },
   { title: 'Attendance', description: 'View and filter attendance history.', to: '/attendance', metric: 'History' },
   { title: 'Teachers', description: 'Manage teacher profiles and hourly rates.', to: '/teachers', metric: 'Master Data' },
+  { title: 'Departments', description: 'Manage active and inactive departments.', to: '/departments', metric: 'Master Data' },
   { title: 'Schedules', description: 'Define class schedules and grace windows.', to: '/schedules', metric: 'Time Rules' },
   { title: 'Settings', description: 'Maintain attendance defaults and timezone.', to: '/settings', metric: 'System Config' },
 ]
 
-const payrollCards = [
+const salaryComputationCards = [
   { title: 'Attendance', description: 'View and filter attendance history.', to: '/attendance', metric: 'History' },
   { title: 'Teachers', description: 'View teacher profiles and rates.', to: '/teachers', metric: 'Master Data' },
   { title: 'Schedules', description: 'View class schedules and grace windows.', to: '/schedules', metric: 'Time Rules' },
 ]
 
 function getCards(role) {
-  if (role === 'payroll_viewer') return payrollCards
+  if (role === 'salary_viewer') return salaryComputationCards
   return cards
 }
 

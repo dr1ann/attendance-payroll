@@ -1,9 +1,9 @@
-# STI Ormoc Teacher Attendance + Payroll (MVP)
+# STI Ormoc Attendance-Based Salary Management System (MVP)
 
 A simple school system project for STI College Ormoc to:
 
 1. Track teacher attendance through QR code scanning.
-2. Compute payroll based on approved attendance records.
+2. Compute salary based on approved attendance records.
 
 This project is intentionally minimal and practical for an individual capstone/class requirement.
 
@@ -16,7 +16,7 @@ The system now has working backend and frontend modules for:
 - Schedule CRUD.
 - QR attendance scan flow with duplicate scan protection.
 - Attendance settings management.
-- Payroll summary API with type-based salary calculation.
+- Salary computation API with type-based attendance calculation.
 
 ## Project Scope (Simple MVP)
 
@@ -26,8 +26,8 @@ The system now has working backend and frontend modules for:
 - Teacher masterlist and schedule management.
 - QR attendance scanning (Time In / Time Out).
 - Attendance logs and basic correction workflow.
-- Payroll computation per cutoff period.
-- Printable/exportable payroll summary.
+- Attendance-based salary computation per cutoff period.
+- Printable/exportable salary summary.
 
 ### Not Included (for now)
 
@@ -40,11 +40,11 @@ The system now has working backend and frontend modules for:
 
 - **Admin (HR/Owner)**
 	- Manage teachers, schedules, and attendance corrections.
-	- Process payroll and generate reports.
+	- Compute attendance-based salaries and generate reports.
 - **Teacher**
 	- Scan QR for daily attendance.
-- **Payroll Viewer (optional)**
-	- Read-only view of payroll summaries.
+- **Salary Viewer (optional)**
+	- Read-only view of salary computations.
 
 ## Core Modules
 
@@ -53,7 +53,7 @@ The system now has working backend and frontend modules for:
 3. **Schedule Management**
 4. **QR Attendance Scanning**
 5. **Attendance Logs & Approvals**
-6. **Payroll Processing**
+6. **Salary Computation**
 7. **Reports**
 
 ## MVP Screens (Exact List)
@@ -64,8 +64,8 @@ The system now has working backend and frontend modules for:
 4. Schedules
 5. Scan Attendance
 6. Attendance Logs
-7. Payroll Cutoff
-8. Payroll Report
+7. Salary Cutoff
+8. Salary Report
 
 ## Data Model (Simple Schema)
 
@@ -74,7 +74,7 @@ The system now has working backend and frontend modules for:
 - `id` (PK)
 - `username`
 - `password_hash`
-- `role` (`admin`, `payroll_viewer`, `teacher`)
+- `role` (`admin`, `salary_viewer`, `teacher`)
 - `teacher_id` (nullable FK reference by convention)
 - `created_at`
 
@@ -99,7 +99,6 @@ The system now has working backend and frontend modules for:
 - `day_of_week`
 - `time_start`
 - `time_end`
-- `grace_minutes`
 
 ### `attendance`
 
@@ -120,13 +119,15 @@ The system now has working backend and frontend modules for:
 - `absence_deduction_amount`
 - `timezone`
 
-## Basic Payroll Rules (Current)
+Late grace for attendance is configured globally in `attendance_settings.late_grace_minutes`.
+
+## Basic Salary Computation Rules (Current)
 
 - `Present`: valid Time In and Time Out on a scheduled day.
-- `Late`: Time In beyond schedule start + grace minutes.
+- `Late`: Time In beyond schedule start + configured late grace minutes.
 - `Absence`: expected schedule session with no complete attendance pair.
 - Overtime: disabled for now.
-- Payroll formulas:
+- Salary formulas:
 	- Full-time: `gross_pay = monthly_salary`
 	- Part-time: `gross_pay = attended_sessions * session_rate`
 	- Deductions (both types):
@@ -156,11 +157,11 @@ The system now has working backend and frontend modules for:
 - Save Time In/Time Out logs with validation.
 - Add attendance logs with correction + approval action.
 
-### Phase 3: Payroll
+### Phase 3: Salary Computation
 
 - Add cutoff creation.
-- Compute payroll entries from approved attendance.
-- Build printable payroll report view.
+- Compute salary entries from approved attendance.
+- Build printable salary report view.
 
 ## STI-Inspired UI Palette
 
@@ -176,7 +177,7 @@ Use these core colors consistently:
 1. Implement local mock data for teachers and logs.
 2. Create reusable table and form components.
 3. Add scan simulation (button/QR text input) before camera integration.
-4. Connect attendance logs to payroll calculator function.
+4. Connect attendance logs to salary calculator function.
 
 ## Run the Project
 
@@ -191,12 +192,12 @@ npm run dev:full
 This project now includes a Node.js + Express backend for Phase 1:
 
 - Token-based authentication (JWT)
-- Role access (`admin`, `payroll_viewer`, `teacher`)
+- Role access (`admin`, `salary_viewer`, `teacher`)
 - Teacher masterlist CRUD with type-specific compensation fields
 - Schedule CRUD
 - Attendance scan and logs
-- Attendance settings (singleton) including payroll deduction amounts
-- Payroll summary and teacher breakdown APIs
+- Attendance settings (singleton) including salary computation deduction amounts
+- Salary computation summary and teacher breakdown APIs
 
 ### Current API Modules
 
@@ -205,8 +206,8 @@ This project now includes a Node.js + Express backend for Phase 1:
 - `/api/schedules` - schedule CRUD and teacher schedule view
 - `/api/attendance` - scan flow and attendance logs
 - `/api/settings/attendance` - attendance and deduction configuration
-- `/api/payroll/summary` - payroll results by period
-- `/api/payroll/teacher/:id/breakdown` - per-teacher attendance breakdown by period
+- `/api/salary-computation/summary` - salary results by period
+- `/api/salary-computation/teacher/:id/breakdown` - per-teacher attendance breakdown by period
 
 ### Environment Setup
 

@@ -1,4 +1,4 @@
-# Attendance Payroll System Change Guide
+# Attendance-Based Salary Computation System Change Guide
 
 This file is a quick reference for developers who need to modify this system.
 
@@ -6,7 +6,7 @@ This file is a quick reference for developers who need to modify this system.
 
 - Frontend: React + Vite (`src/`)
 - Backend API: Express (`server/`)
-- Database: MySQL (`attendance_payroll` by default)
+- Database: MySQL (`attendance_salary` by default)
 - Auth: JWT + bcrypt password hashing
 
 ## 2) High-level request flow
@@ -25,9 +25,9 @@ This file is a quick reference for developers who need to modify this system.
 - `server/routes/auth.js`: login, profile, password endpoints.
 - `server/routes/teachers.js`: teacher CRUD endpoints and type-specific payload validation.
 - `server/routes/schedules.js`: schedule CRUD endpoints.
-- `server/routes/settings.js`: attendance + payroll deduction settings endpoints.
+- `server/routes/settings.js`: attendance + salary deduction settings endpoints.
 - `server/routes/attendance.js`: attendance scan/log endpoints.
-- `server/routes/payroll.js`: payroll summary and per-teacher breakdown endpoints.
+-- `server/routes/salaryComputation.js`: salary summary and per-teacher breakdown endpoints.
 - `server/middleware/auth.js`: JWT auth and role authorization.
 
 ### Database bootstrap
@@ -134,7 +134,7 @@ Use this guide:
 - Change default admin seed behavior: `server/scripts/initDb.js`
 - Change auth guards and roles: `server/middleware/auth.js`
 
-## 10) Payroll and teacher type implementation
+## 10) Salary computation and teacher type implementation
 
 ### Teacher payload contract (`server/routes/teachers.js`)
 
@@ -153,21 +153,21 @@ Conditional required fields:
 
 The API stores only the relevant compensation field for each type and zeroes the other field.
 
-### Payroll endpoints (`server/routes/payroll.js`)
+### Salary computation endpoints (`server/routes/salaryComputation.js`)
 
-- `GET /api/payroll/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
-- `GET /api/payroll/teacher/:id/breakdown?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+- `GET /api/salary-computation/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
+- `GET /api/salary-computation/teacher/:id/breakdown?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
 
 ### Calculation rules currently implemented
 
-- Full-time gross pay: `monthly_salary`
-- Part-time gross pay: `session_rate * attended_sessions`
+- Full-time gross salary: `monthly_salary`
+- Part-time gross salary: `session_rate * attended_sessions`
 - Late deduction: `late_count * attendance_settings.late_deduction_amount`
 - Absence deduction: `absence_count * attendance_settings.absence_deduction_amount`
-- Net pay: `max(0, gross - late_deduction - absence_deduction)`
+- Net salary: `max(0, gross - late_deduction - absence_deduction)`
 - Overtime: not included
 
-### Attendance metrics used by payroll
+### Attendance metrics used by salary computation
 
 - `attended_sessions`: day has both `time_in` and `time_out`
 - `late_count`: count of `time_in` rows marked `late`

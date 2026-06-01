@@ -4,11 +4,13 @@ import AppLayout from '../layout/AppLayout'
 import LoginPage from '../pages/LoginPage'
 import DashboardPage from '../pages/DashboardPage'
 import TeachersPage from '../pages/TeachersPage'
+import DepartmentsPage from '../pages/DepartmentsPage'
 import SchedulesPage from '../pages/SchedulesPage'
 import SettingsPage from '../pages/SettingsPage'
 import ScanPage from '../pages/ScanPage'
 import AttendancePage from '../pages/AttendancePage'
 import MyAttendancePage from '../pages/MyAttendancePage'
+import SalaryComputationPage from '../pages/SalaryComputationPage'
 
 export default function AppRouter() {
   return (
@@ -21,7 +23,9 @@ export default function AppRouter() {
           <Route path="/scan" element={<ScanPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/my-attendance" element={<MyAttendancePage />} />
+          <Route path="/salary-computation" element={<SalaryComputationPage />} />
           <Route path="/teachers" element={<TeachersPage />} />
+          <Route path="/departments" element={<DepartmentsPage />} />
           <Route path="/schedules" element={<SchedulesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

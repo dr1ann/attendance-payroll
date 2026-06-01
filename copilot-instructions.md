@@ -1,4 +1,4 @@
-# Copilot Agent Instructions — Attendance-Payroll
+# Copilot Agent Instructions — Attendance-Based Salary Computation
 
 ## Stack & Language Rules
 - **Frontend:** Vite + React. All frontend files use `.jsx` for components and `.js` for utilities/constants.
@@ -11,10 +11,10 @@
 ## Project Structure — Follow This Exactly
 
 ```
-attendance-payroll/
+attendance-salary-computation/
 ├── server/
 │   ├── middleware/        # Express middlewares (e.g., auth guards)
-│   ├── routes/            # One file per domain: attendance.js, auth.js, payroll.js, schedules.js, settings.js, teachers.js
+│   ├── routes/            # One file per domain: attendance.js, auth.js, salaryComputation.js, schedules.js, settings.js, teachers.js
 │   ├── scripts/
 │   │   └── initDb.js      # DB seed/init scripts
 │   ├── db.js              # MySQL connection pool — import this for all queries

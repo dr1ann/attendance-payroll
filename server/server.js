@@ -1,11 +1,12 @@
 import express from 'express'
 import cors from 'cors'
 import { authRouter } from './routes/auth.js'
+import { departmentsRouter } from './routes/departments.js'
 import { teachersRouter } from './routes/teachers.js'
 import { schedulesRouter } from './routes/schedules.js'
 import { settingsRouter } from './routes/settings.js'
 import { attendanceRouter } from './routes/attendance.js'
-import { payrollRouter } from './routes/payroll.js'
+import { salaryRouter } from './routes/salaryComputation.js'
 import { authenticateToken } from './middleware/auth.js'
 
 const app = express()
@@ -15,15 +16,16 @@ app.use(cors())
 app.use(express.json())
 
 app.get('/api/health', (_, res) => {
-  res.json({ ok: true, service: 'attendance-payroll-api' })
+  res.json({ ok: true, service: 'attendance-salary-computation-api' })
 })
 
 app.use('/api/auth', authRouter)
+app.use('/api/departments', authenticateToken, departmentsRouter)
 app.use('/api/teachers', authenticateToken, teachersRouter)
 app.use('/api/schedules', authenticateToken, schedulesRouter)
 app.use('/api/settings', authenticateToken, settingsRouter)
 app.use('/api/attendance', authenticateToken, attendanceRouter)
-app.use('/api/payroll', authenticateToken, payrollRouter)
+app.use('/api/salary-computation', authenticateToken, salaryRouter)
 
 app.use((err, _, res, next) => {
   void next

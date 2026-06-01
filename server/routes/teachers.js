@@ -44,7 +44,7 @@ function validateTeacherPayload(payload) {
   return null
 }
 
-teachersRouter.get('/', authorizeRoles('admin', 'payroll_viewer'), async (req, res) => {
+teachersRouter.get('/', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
   const search = req.query.q?.trim()
 
   const rows = search
@@ -129,6 +129,19 @@ teachersRouter.post('/', authorizeRoles('admin'), async (req, res) => {
     return res.status(400).json({ message: validationMessage })
   }
 
+  const departmentName = department.trim()
+  const [departmentRow] = await query(
+    `SELECT id
+     FROM departments
+     WHERE name = ? AND status = 'active'
+     LIMIT 1`,
+    [departmentName],
+  )
+
+  if (!departmentRow) {
+    return res.status(400).json({ message: 'Department must be active and valid' })
+  }
+
   try {
     await query(
       `INSERT INTO teachers (employee_no, first_name, last_name, department, teacher_type, monthly_salary, session_rate, hourly_rate, status)
@@ -138,7 +151,7 @@ teachersRouter.post('/', authorizeRoles('admin'), async (req, res) => {
         employee_no,
         first_name,
         last_name,
-        department,
+        departmentName,
         teacher_type,
         teacher_type === 'full_time' ? Number(monthly_salary || 0) : 0,
         teacher_type === 'part_time' ? Number(session_rate || 0) : 0,
@@ -174,6 +187,19 @@ teachersRouter.put('/:id', authorizeRoles('admin'), async (req, res) => {
     return res.status(400).json({ message: validationMessage })
   }
 
+  const departmentName = department.trim()
+  const [departmentRow] = await query(
+    `SELECT id
+     FROM departments
+     WHERE name = ? AND status = 'active'
+     LIMIT 1`,
+    [departmentName],
+  )
+
+  if (!departmentRow) {
+    return res.status(400).json({ message: 'Department must be active and valid' })
+  }
+
   try {
     const result = await query(
       `UPDATE teachers
@@ -184,7 +210,7 @@ teachersRouter.put('/:id', authorizeRoles('admin'), async (req, res) => {
         employee_no,
         first_name,
         last_name,
-        department,
+        departmentName,
         teacher_type,
         teacher_type === 'full_time' ? Number(monthly_salary || 0) : 0,
         teacher_type === 'part_time' ? Number(session_rate || 0) : 0,

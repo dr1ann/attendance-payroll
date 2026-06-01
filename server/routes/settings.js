@@ -4,7 +4,7 @@ import { authorizeRoles } from '../middleware/auth.js'
 
 export const settingsRouter = Router()
 
-settingsRouter.get('/attendance', authorizeRoles('admin', 'payroll_viewer'), async (_, res) => {
+settingsRouter.get('/attendance', authorizeRoles('admin', 'salary_viewer'), async (_, res) => {
   const rows = await query(
     `SELECT id, late_grace_minutes, duplicate_scan_window_minutes,
             late_deduction_amount, absence_deduction_amount, timezone

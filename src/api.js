@@ -21,3 +21,11 @@ export async function apiRequest(path, options = {}, token = null) {
 
   return payload
 }
+
+export async function getSalaryComputationSummary(date_from, date_to, token = null) {
+  return apiRequest(`/salary-computation/summary?date_from=${date_from}&date_to=${date_to}`, {}, token)
+}
+
+export async function getAttendanceSalaryBreakdown(teacherId, date_from, date_to, token = null) {
+  return apiRequest(`/salary-computation/teacher/${teacherId}/breakdown?date_from=${date_from}&date_to=${date_to}`, {}, token)
+}

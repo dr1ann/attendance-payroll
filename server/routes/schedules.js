@@ -4,9 +4,9 @@ import { authorizeRoles } from '../middleware/auth.js'
 
 export const schedulesRouter = Router()
 
-schedulesRouter.get('/', authorizeRoles('admin', 'payroll_viewer'), async (_, res) => {
+schedulesRouter.get('/', authorizeRoles('admin', 'salary_viewer'), async (_, res) => {
   const rows = await query(
-    `SELECT s.id, s.teacher_id, s.day_of_week, s.time_start, s.time_end, s.grace_minutes,
+    `SELECT s.id, s.teacher_id, s.day_of_week, s.time_start, s.time_end,
             t.employee_no, t.first_name, t.last_name
      FROM schedules s
      JOIN teachers t ON t.id = s.teacher_id
@@ -24,7 +24,7 @@ schedulesRouter.get('/my', authorizeRoles('teacher'), async (req, res) => {
   }
 
   const rows = await query(
-    `SELECT s.id, s.day_of_week, s.time_start, s.time_end, s.grace_minutes
+    `SELECT s.id, s.day_of_week, s.time_start, s.time_end
      FROM schedules s
      WHERE s.teacher_id = ?
      ORDER BY s.day_of_week`,
@@ -35,45 +35,43 @@ schedulesRouter.get('/my', authorizeRoles('teacher'), async (req, res) => {
 })
 
 schedulesRouter.post('/', authorizeRoles('admin'), async (req, res) => {
-  const { teacher_id, day_of_week, time_start, time_end, grace_minutes } = req.body
+  const { teacher_id, day_of_week, time_start, time_end } = req.body
 
   if (
     !teacher_id ||
     day_of_week === undefined ||
     !time_start ||
-    !time_end ||
-    grace_minutes === undefined
+    !time_end
   ) {
     return res.status(400).json({ message: 'Missing required fields' })
   }
 
   await query(
-    `INSERT INTO schedules (teacher_id, day_of_week, time_start, time_end, grace_minutes)
-     VALUES (?, ?, ?, ?, ?)`,
-    [teacher_id, day_of_week, time_start, time_end, grace_minutes],
+    `INSERT INTO schedules (teacher_id, day_of_week, time_start, time_end)
+     VALUES (?, ?, ?, ?)`,
+    [teacher_id, day_of_week, time_start, time_end],
   )
 
   return res.status(201).json({ message: 'Schedule created' })
 })
 
 schedulesRouter.put('/:id', authorizeRoles('admin'), async (req, res) => {
-  const { teacher_id, day_of_week, time_start, time_end, grace_minutes } = req.body
+  const { teacher_id, day_of_week, time_start, time_end } = req.body
 
   if (
     !teacher_id ||
     day_of_week === undefined ||
     !time_start ||
-    !time_end ||
-    grace_minutes === undefined
+    !time_end
   ) {
     return res.status(400).json({ message: 'Missing required fields' })
   }
 
   const result = await query(
     `UPDATE schedules
-     SET teacher_id = ?, day_of_week = ?, time_start = ?, time_end = ?, grace_minutes = ?
+     SET teacher_id = ?, day_of_week = ?, time_start = ?, time_end = ?
      WHERE id = ?`,
-    [teacher_id, day_of_week, time_start, time_end, grace_minutes, req.params.id],
+    [teacher_id, day_of_week, time_start, time_end, req.params.id],
   )
 
   if (!result.affectedRows) {

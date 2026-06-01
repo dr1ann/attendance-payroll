@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.js'
 import { authorizeRoles } from '../middleware/auth.js'
 
-export const payrollRouter = Router()
+export const salaryRouter = Router()
 
 function parseDateRange(dateFrom, dateTo) {
   if (!dateFrom || !dateTo) {
@@ -88,8 +88,8 @@ function computeAttendanceStats(attendanceRows) {
   return { attendedSessions, lateCount }
 }
 
-function computePayrollForTeacher(teacher, periodStats, settings) {
-  const grossPay =
+function computeSalaryForTeacher(teacher, periodStats, settings) {
+  const grossSalary =
     teacher.teacher_type === 'full_time'
       ? Number(teacher.monthly_salary || 0)
       : Number(teacher.session_rate || 0) * periodStats.attendedSessions
@@ -100,18 +100,18 @@ function computePayrollForTeacher(teacher, periodStats, settings) {
       : 0
   const absenceDeduction = periodStats.absenceCount * Number(settings.absence_deduction_amount || 0)
   const totalDeductions = lateDeduction + absenceDeduction
-  const netPay = Math.max(0, grossPay - totalDeductions)
+  const netSalary = Math.max(0, grossSalary - totalDeductions)
 
   return {
-    grossPay,
+    grossSalary,
     lateDeduction,
     absenceDeduction,
     totalDeductions,
-    netPay,
+    netSalary,
   }
 }
 
-payrollRouter.get('/summary', authorizeRoles('admin', 'payroll_viewer'), async (req, res) => {
+salaryRouter.get('/summary', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
   const { date_from, date_to } = req.query
   const parsedRange = parseDateRange(date_from, date_to)
 
@@ -167,7 +167,7 @@ payrollRouter.get('/summary', authorizeRoles('admin', 'payroll_viewer'), async (
     const stats = computeAttendanceStats(teacherAttendance)
     const absenceCount = Math.max(0, expectedSessions - stats.attendedSessions)
 
-    const payroll = computePayrollForTeacher(
+    const salary = computeSalaryForTeacher(
       teacher,
       {
         attendedSessions: stats.attendedSessions,
@@ -204,13 +204,13 @@ payrollRouter.get('/summary', authorizeRoles('admin', 'payroll_viewer'), async (
       deductions: {
         late_deduction_amount: Number(settings.late_deduction_amount || 0),
         absence_deduction_amount: Number(settings.absence_deduction_amount || 0),
-        late_deduction_total: payroll.lateDeduction,
-        absence_deduction_total: payroll.absenceDeduction,
-        total: payroll.totalDeductions,
+        late_deduction_total: salary.lateDeduction,
+        absence_deduction_total: salary.absenceDeduction,
+        total: salary.totalDeductions,
       },
-      payroll: {
-        gross_pay: payroll.grossPay,
-        net_pay: payroll.netPay,
+      salary: {
+        gross_salary: salary.grossSalary,
+        net_salary: salary.netSalary,
       },
       formula:
         teacher.teacher_type === 'full_time'
@@ -230,7 +230,7 @@ payrollRouter.get('/summary', authorizeRoles('admin', 'payroll_viewer'), async (
   })
 })
 
-payrollRouter.get('/teacher/:id/breakdown', authorizeRoles('admin', 'payroll_viewer'), async (req, res) => {
+salaryRouter.get('/teacher/:id/breakdown', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
   const { date_from, date_to } = req.query
   const parsedRange = parseDateRange(date_from, date_to)
 

@@ -12,7 +12,6 @@ const emptySchedule = {
   day_of_week: 1,
   time_start: '08:00',
   time_end: '17:00',
-  grace_minutes: 15,
 }
 
 export default function SchedulesPage() {
@@ -83,12 +82,6 @@ export default function SchedulesPage() {
       errs.time_end = 'End time must be after start time'
     }
 
-    if (scheduleForm.grace_minutes === '' || Number.isNaN(Number(scheduleForm.grace_minutes))) {
-      errs.grace_minutes = 'Grace minutes is required'
-    } else if (Number(scheduleForm.grace_minutes) < 0) {
-      errs.grace_minutes = 'Grace minutes cannot be negative'
-    }
-
     if (Object.keys(errs).length) {
       setFormErrors(errs)
       return
@@ -105,7 +98,6 @@ export default function SchedulesPage() {
             ...scheduleForm,
             teacher_id: Number(scheduleForm.teacher_id),
             day_of_week: Number(scheduleForm.day_of_week),
-            grace_minutes: Number(scheduleForm.grace_minutes),
           }),
         },
         token,
@@ -179,14 +171,13 @@ export default function SchedulesPage() {
               <th className="px-4 py-3 text-left font-medium text-gray-600">Day</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Start</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">End</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Grace (min)</th>
               {isAdmin ? <th className="px-4 py-3 text-left font-medium text-gray-600 w-[1%] whitespace-nowrap">Actions</th> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredSchedules.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin ? 6 : 5} className="px-4 py-8 text-center text-gray-500">No schedules found</td>
+                <td colSpan={isAdmin ? 5 : 4} className="px-4 py-8 text-center text-gray-500">No schedules found</td>
               </tr>
             ) : null}
             {filteredSchedules.map((schedule) => (
@@ -195,7 +186,6 @@ export default function SchedulesPage() {
                 <td className="px-4 py-3">{days[schedule.day_of_week]}</td>
                 <td className="px-4 py-3">{String(schedule.time_start).slice(0, 5)}</td>
                 <td className="px-4 py-3">{String(schedule.time_end).slice(0, 5)}</td>
-                <td className="px-4 py-3">{schedule.grace_minutes}</td>
                 {isAdmin ? (
                   <td className="px-4 py-3">
                     <ActionButtons
@@ -206,7 +196,6 @@ export default function SchedulesPage() {
                           day_of_week: schedule.day_of_week,
                           time_start: String(schedule.time_start).slice(0, 5),
                           time_end: String(schedule.time_end).slice(0, 5),
-                          grace_minutes: schedule.grace_minutes,
                         })
                         setFormOpen(true)
                       }}
@@ -291,19 +280,6 @@ export default function SchedulesPage() {
             />
             {formErrors.time_end ? (
               <span className="text-xs text-red-600">{formErrors.time_end}</span>
-            ) : null}
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-            Grace Minutes
-            <input
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              type="number"
-              min="0"
-              value={scheduleForm.grace_minutes}
-              onChange={(event) => setScheduleForm((prev) => ({ ...prev, grace_minutes: event.target.value }))}
-            />
-            {formErrors.grace_minutes ? (
-              <span className="text-xs text-red-600">{formErrors.grace_minutes}</span>
             ) : null}
           </label>
         </div>

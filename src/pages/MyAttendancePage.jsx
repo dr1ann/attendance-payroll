@@ -172,7 +172,6 @@ export default function MyAttendancePage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Day</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Start</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">End</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Grace (min)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -181,7 +180,6 @@ export default function MyAttendancePage() {
                     <td className="px-4 py-3 font-medium">{days[s.day_of_week]}</td>
                     <td className="px-4 py-3">{formatTimeSlot(s.time_start)}</td>
                     <td className="px-4 py-3">{formatTimeSlot(s.time_end)}</td>
-                    <td className="px-4 py-3">{s.grace_minutes}</td>
                   </tr>
                 ))}
               </tbody>

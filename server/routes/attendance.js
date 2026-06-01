@@ -75,6 +75,7 @@ async function getTodayContext() {
   return {
     settings,
     timezone,
+    lateGraceMinutes: Number(settings.late_grace_minutes || 0),
     duplicate_scan_window_minutes,
     todayDate,
     dayOfWeek,
@@ -109,7 +110,7 @@ attendanceRouter.get('/today-schedules', authorizeRoles('admin'), async (req, re
   }
 
   const schedules = await query(
-    `SELECT id, time_start, time_end, grace_minutes FROM schedules 
+    `SELECT id, time_start, time_end FROM schedules 
      WHERE teacher_id = ? AND day_of_week = ?
      ORDER BY time_start ASC`,
     [teacher.id, dayOfWeek],
@@ -137,7 +138,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
     return res.status(context.error.status).json({ message: context.error.message })
   }
 
-  const { timezone, duplicate_scan_window_minutes, todayDate, dayOfWeek } = context
+  const { timezone, duplicate_scan_window_minutes, lateGraceMinutes, todayDate, dayOfWeek } = context
 
   // Find the teacher
   const [teacher] = await query(
@@ -183,7 +184,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
 
   // Find matching schedules for today (could be multiple slots)
   const schedules = await query(
-    `SELECT id, time_start, time_end, grace_minutes FROM schedules 
+    `SELECT id, time_start, time_end FROM schedules 
      WHERE teacher_id = ? AND day_of_week = ?
      ORDER BY time_start ASC`,
     [teacher.id, dayOfWeek],
@@ -228,7 +229,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
   if (scanType === 'time_in' && schedule) {
     const currentMinutes = timeToMinutes(currentTime)
     const scheduleStartMinutes = timeToMinutes(schedule.time_start)
-    const graceMinutes = teacher.teacher_type === 'full_time' ? 0 : Number(schedule.grace_minutes || 0)
+    const graceMinutes = teacher.teacher_type === 'full_time' ? 0 : lateGraceMinutes
 
     if (currentMinutes > scheduleStartMinutes + graceMinutes) {
       status = 'late'
@@ -293,7 +294,7 @@ attendanceRouter.get('/my', authorizeRoles('teacher'), async (req, res) => {
 })
 
 // GET /api/attendance - Get attendance records with filters
-attendanceRouter.get('/', authorizeRoles('admin', 'payroll_viewer'), async (req, res) => {
+attendanceRouter.get('/', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
   const { date_from, date_to, teacher_id, status } = req.query
 
   let sql = `
@@ -332,7 +333,7 @@ attendanceRouter.get('/', authorizeRoles('admin', 'payroll_viewer'), async (req,
 })
 
 // GET /api/attendance/teacher/:id - Get attendance for a specific teacher
-attendanceRouter.get('/teacher/:id', authorizeRoles('admin', 'payroll_viewer'), async (req, res) => {
+attendanceRouter.get('/teacher/:id', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
   const { date_from, date_to } = req.query
   const teacherId = req.params.id
 
@@ -360,7 +361,7 @@ attendanceRouter.get('/teacher/:id', authorizeRoles('admin', 'payroll_viewer'), 
 })
 
 // GET /api/attendance/today - Get today's attendance summary
-attendanceRouter.get('/today', authorizeRoles('admin', 'payroll_viewer'), async (req, res) => {
+attendanceRouter.get('/today', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
   const [settings] = await query(
     'SELECT timezone FROM attendance_settings WHERE id = 1',
   )

@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(token && user),
       isAdmin: user?.role === 'admin',
       isTeacher: user?.role === 'teacher',
-      isPayrollViewer: user?.role === 'payroll_viewer',
+      isSalaryViewer: user?.role === 'salary_viewer',
       login,
       logout,
       refreshProfile,

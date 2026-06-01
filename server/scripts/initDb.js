@@ -32,7 +32,7 @@ async function init() {
       id INT PRIMARY KEY AUTO_INCREMENT,
       username VARCHAR(100) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
-      role ENUM('admin', 'payroll_viewer', 'teacher') NOT NULL DEFAULT 'admin',
+      role ENUM('admin', 'salary_viewer', 'teacher') NOT NULL DEFAULT 'admin',
       teacher_id INT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
@@ -41,7 +41,7 @@ async function init() {
   // Ensure existing table has teacher role and teacher_id column
   await connection.query(`
     ALTER TABLE users
-    MODIFY COLUMN role ENUM('admin', 'payroll_viewer', 'teacher') NOT NULL DEFAULT 'admin'
+    MODIFY COLUMN role ENUM('admin', 'salary_viewer', 'teacher') NOT NULL DEFAULT 'admin'
   `)
 
   const [cols] = await connection.query(`
@@ -68,6 +68,16 @@ async function init() {
       hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0,
       status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS departments (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `)
 
@@ -119,18 +129,34 @@ async function init() {
   `)
 
   await connection.query(`
+    INSERT IGNORE INTO departments (name)
+    SELECT DISTINCT TRIM(department)
+    FROM teachers
+    WHERE department IS NOT NULL AND TRIM(department) <> ''
+  `)
+
+  await connection.query(`
     CREATE TABLE IF NOT EXISTS schedules (
       id INT PRIMARY KEY AUTO_INCREMENT,
       teacher_id INT NOT NULL,
       day_of_week TINYINT NOT NULL,
       time_start TIME NOT NULL,
       time_end TIME NOT NULL,
-      grace_minutes INT NOT NULL DEFAULT 15,
       CONSTRAINT fk_schedules_teacher
         FOREIGN KEY (teacher_id) REFERENCES teachers(id)
         ON DELETE CASCADE
     )
   `)
+
+  const [scheduleGraceCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'schedules' AND COLUMN_NAME = 'grace_minutes'`,
+    [dbName],
+  )
+
+  if (scheduleGraceCols.length > 0) {
+    await connection.query('ALTER TABLE schedules DROP COLUMN grace_minutes')
+  }
 
   await connection.query(`
     CREATE TABLE IF NOT EXISTS attendance_settings (

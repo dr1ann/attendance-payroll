@@ -43,7 +43,7 @@ export default function LoginPage() {
         </div>
 
         {/* Header */}
-        <p className="text-center text-gray-500 mb-8">STI College Ormoc: Attendance & Payroll Management</p>
+        <p className="text-center text-gray-500 mb-8">STI College Ormoc: Attendance-Based Salary Management</p>
 
         <form className="grid gap-5" onSubmit={onSubmit}>
           <div>

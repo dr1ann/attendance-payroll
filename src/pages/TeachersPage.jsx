@@ -21,6 +21,7 @@ const emptyTeacher = {
 export default function TeachersPage() {
   const { token, isAdmin } = useAuth()
   const [teachers, setTeachers] = useState([])
+  const [departments, setDepartments] = useState([])
   const [teacherForm, setTeacherForm] = useState(emptyTeacher)
   const [editTeacherId, setEditTeacherId] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -44,15 +45,31 @@ export default function TeachersPage() {
   const [teacherModalError, setTeacherModalError] = useState('')
   const [accountModalError, setAccountModalError] = useState('')
   const [resetModalError, setResetModalError] = useState('')
+  const [departmentError, setDepartmentError] = useState('')
 
   const loadTeachers = useCallback(async () => {
     const rows = await apiRequest('/teachers', {}, token)
     setTeachers(rows)
   }, [token])
 
+  const loadDepartments = useCallback(async () => {
+    const rows = await apiRequest('/departments', {}, token)
+    setDepartments(rows)
+  }, [token])
+
   useEffect(() => {
     loadTeachers().catch((err) => setError(err.message))
   }, [loadTeachers])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setDepartments([])
+      setDepartmentError('')
+      return
+    }
+
+    loadDepartments().catch((err) => setDepartmentError(err.message))
+  }, [isAdmin, loadDepartments])
 
   useEffect(() => {
     if (!qrTarget) {
@@ -101,7 +118,15 @@ export default function TeachersPage() {
     if (!teacherForm.employee_no.trim()) errs.employee_no = 'Employee number is required'
     if (!teacherForm.first_name.trim()) errs.first_name = 'First name is required'
     if (!teacherForm.last_name.trim()) errs.last_name = 'Last name is required'
-    if (!teacherForm.department.trim()) errs.department = 'Department is required'
+    const departmentName = teacherForm.department.trim()
+    if (!departmentName) {
+      errs.department = 'Department is required'
+    } else {
+      const selectedDepartment = departments.find((department) => department.name === departmentName)
+      if (!selectedDepartment || selectedDepartment.status !== 'active') {
+        errs.department = 'Select an active department'
+      }
+    }
     if (!['full_time', 'part_time'].includes(teacherForm.teacher_type)) {
       errs.teacher_type = 'Teacher type is required'
     }
@@ -134,6 +159,7 @@ export default function TeachersPage() {
           method: editTeacherId ? 'PUT' : 'POST',
           body: JSON.stringify({
             ...teacherForm,
+            department: departmentName,
             monthly_salary: Number(teacherForm.monthly_salary || 0),
             session_rate: Number(teacherForm.session_rate || 0),
           }),
@@ -153,6 +179,17 @@ export default function TeachersPage() {
       setLoading(false)
     }
   }
+
+  const departmentOptions = useMemo(
+    () => departments.slice().sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === 'active' ? -1 : 1
+      }
+
+      return a.name.localeCompare(b.name)
+    }),
+    [departments],
+  )
 
   const deleteTeacher = async () => {
     if (!isAdmin || !deleteTarget) {
@@ -301,6 +338,8 @@ export default function TeachersPage() {
         />
         <Button variant="secondary" icon={<Icon name="search" />}>Search</Button>
       </div>
+
+      {departmentError ? <p className="text-red-600 text-sm mb-4">{departmentError}</p> : null}
 
       {error ? <p className="text-red-600 text-sm mb-4">{error}</p> : null}
 
@@ -461,11 +500,21 @@ export default function TeachersPage() {
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Department
-            <input
+            <select
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={teacherForm.department}
               onChange={(event) => setTeacherForm((prev) => ({ ...prev, department: event.target.value }))}
-            />
+            >
+              <option value="">Select department</option>
+              {departmentOptions.map((department) => (
+                <option key={department.id} value={department.name} disabled={department.status !== 'active'}>
+                  {department.name}{department.status !== 'active' ? ' (inactive)' : ''}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-500">
+              Inactive departments stay visible for context but cannot be selected for new teachers.
+            </span>
             {teacherFormErrors.department ? (
               <span className="text-xs text-red-600">{teacherFormErrors.department}</span>
             ) : null}
