@@ -3,6 +3,7 @@ import { query } from '../db.js'
 import { authorizeRoles } from '../middleware/auth.js'
 
 export const attendanceRouter = Router()
+export const publicAttendanceRouter = Router()
 
 /**
  * Get today's date in the configured timezone as YYYY-MM-DD
@@ -81,6 +82,186 @@ async function getTodayContext() {
     dayOfWeek,
   }
 }
+
+// ── Public endpoints (no auth) ──────────────────────────────────────────────
+
+/**
+ * Validate employee_no from public endpoints: trim, length, alphanumeric only.
+ * Returns the cleaned value or null if invalid.
+ */
+function validateEmployeeNo(raw) {
+  if (typeof raw !== 'string') return null
+  const cleaned = raw.trim()
+  if (!cleaned || cleaned.length > 20) return null
+  if (!/^[A-Za-z0-9-_]+$/.test(cleaned)) return null
+  return cleaned
+}
+
+// GET /api/public/attendance/today-schedules
+publicAttendanceRouter.get('/today-schedules', async (req, res) => {
+  const employee_no = validateEmployeeNo(req.query.employee_no)
+
+  if (!employee_no) {
+    return res.status(400).json({ message: 'Employee number is required' })
+  }
+
+  const context = await getTodayContext()
+  if (context.error) {
+    return res.status(context.error.status).json({ message: context.error.message })
+  }
+
+  const { timezone, todayDate, dayOfWeek } = context
+
+  const [teacher] = await query(
+    'SELECT id, first_name, last_name, status, teacher_type FROM teachers WHERE employee_no = ?',
+    [employee_no],
+  )
+
+  if (!teacher) {
+    return res.status(404).json({ message: 'Teacher not found', employee_no })
+  }
+
+  if (teacher.status !== 'active') {
+    return res.status(400).json({ message: 'Teacher is inactive' })
+  }
+
+  const schedules = await query(
+    `SELECT id, time_start, time_end FROM schedules 
+     WHERE teacher_id = ? AND day_of_week = ?
+     ORDER BY time_start ASC`,
+    [teacher.id, dayOfWeek],
+  )
+
+  return res.json({
+    teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}` },
+    timezone,
+    todayDate,
+    dayOfWeek,
+    schedules,
+  })
+})
+
+// POST /api/public/attendance/scan
+publicAttendanceRouter.post('/scan', async (req, res) => {
+  const employee_no = validateEmployeeNo(req.body?.employee_no)
+  const { schedule_id } = req.body || {}
+
+  if (!employee_no) {
+    return res.status(400).json({ message: 'Employee number is required' })
+  }
+
+  const context = await getTodayContext()
+  if (context.error) {
+    return res.status(context.error.status).json({ message: context.error.message })
+  }
+
+  const { timezone, duplicate_scan_window_minutes, lateGraceMinutes, todayDate, dayOfWeek } = context
+
+  const [teacher] = await query(
+    'SELECT id, first_name, last_name, status, teacher_type FROM teachers WHERE employee_no = ?',
+    [employee_no],
+  )
+
+  if (!teacher) {
+    return res.status(404).json({ message: 'Teacher not found', employee_no })
+  }
+
+  if (teacher.status !== 'active') {
+    return res.status(400).json({
+      message: 'Teacher is inactive',
+      teacher: { name: `${teacher.first_name} ${teacher.last_name}` },
+    })
+  }
+
+  const currentDateTime = getCurrentDateTime(timezone)
+  const currentTime = getCurrentTime(timezone)
+
+  const duplicateWindow = await query(
+    `SELECT id, scan_type, scan_time FROM attendance 
+     WHERE teacher_id = ? 
+     AND scan_time > DATE_SUB(?, INTERVAL ? MINUTE)
+     ORDER BY scan_time DESC
+     LIMIT 1`,
+    [teacher.id, currentDateTime, duplicate_scan_window_minutes],
+  )
+
+  if (duplicateWindow.length > 0) {
+    const lastScan = duplicateWindow[0]
+    return res.status(400).json({
+      message: 'Duplicate scan detected',
+      lastScan: { type: lastScan.scan_type, time: lastScan.scan_time },
+      windowMinutes: duplicate_scan_window_minutes,
+    })
+  }
+
+  const schedules = await query(
+    `SELECT id, time_start, time_end FROM schedules 
+     WHERE teacher_id = ? AND day_of_week = ?
+     ORDER BY time_start ASC`,
+    [teacher.id, dayOfWeek],
+  )
+
+  const todayScans = await query(
+    `SELECT scan_type FROM attendance 
+     WHERE teacher_id = ? AND DATE(scan_time) = ?
+     ORDER BY scan_time DESC`,
+    [teacher.id, todayDate],
+  )
+
+  const hasTimeIn = todayScans.some(s => s.scan_type === 'time_in')
+  const hasTimeOut = todayScans.some(s => s.scan_type === 'time_out')
+  if (hasTimeIn && hasTimeOut) {
+    return res.status(400).json({
+      message: 'Attendance already recorded for today (time in and out)',
+    })
+  }
+
+  let scanType = 'time_in'
+  if (todayScans.length > 0) {
+    scanType = todayScans[0].scan_type === 'time_in' ? 'time_out' : 'time_in'
+  }
+
+  let status = 'on_time'
+  let schedule = selectSchedule(currentTime, schedules)
+
+  if (schedule_id) {
+    const match = schedules.find((s) => s.id === Number(schedule_id))
+    if (!match) {
+      return res.status(400).json({ message: 'Selected schedule is not valid for today' })
+    }
+    schedule = match
+  }
+
+  if (scanType === 'time_in' && schedule) {
+    const currentMinutes = timeToMinutes(currentTime)
+    const scheduleStartMinutes = timeToMinutes(schedule.time_start)
+    const graceMinutes = teacher.teacher_type === 'full_time' ? 0 : lateGraceMinutes
+    if (currentMinutes > scheduleStartMinutes + graceMinutes) {
+      status = 'late'
+    }
+  }
+
+  await query(
+    `INSERT INTO attendance (teacher_id, schedule_id, scan_time, scan_type, status)
+     VALUES (?, ?, ?, ?, ?)`,
+    [teacher.id, schedule?.id || null, currentDateTime, scanType, status],
+  )
+
+  return res.status(201).json({
+    message: 'Scan recorded successfully',
+    attendance: {
+      teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}` },
+      scan_type: scanType,
+      scan_time: currentDateTime,
+      status,
+      schedule: schedule
+        ? { time_start: schedule.time_start, time_end: schedule.time_end }
+        : null,
+    },
+  })
+})
+
+// ── Admin-protected endpoints ─────────────────────────────────────────────────
 
 attendanceRouter.get('/today-schedules', authorizeRoles('admin'), async (req, res) => {
   const { employee_no } = req.query

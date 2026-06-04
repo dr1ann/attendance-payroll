@@ -9,9 +9,9 @@ import Modal from '../components/ui/Modal'
 
 const adminNav = [
   { label: 'Dashboard', to: '/', icon: 'dashboard' },
-  { label: 'Scan QR', to: '/scan', icon: 'qr-scan' },
   { label: 'Attendance', to: '/attendance', icon: 'history' },
   { label: 'Salary Computation', to: '/salary-computation', icon: 'calendar' },
+  { label: 'Reports', to: '/reports', icon: 'save' },
   { label: 'Teachers', to: '/teachers', icon: 'users' },
   { label: 'Departments', to: '/departments', icon: 'users' },
   { label: 'Schedules', to: '/schedules', icon: 'clock' },
@@ -74,7 +74,7 @@ export default function AppLayout() {
   return (
     <main className="grid grid-cols-[256px_1fr] h-screen">
       <aside className="bg-gray-50 border-r border-gray-200 p-4 flex flex-col gap-4 sticky top-0 h-screen overflow-hidden">
-        
+
         <AppLogo />
         <nav className="flex flex-col gap-2" aria-label="Main navigation">
           {navItems.map((item) => (
@@ -83,10 +83,9 @@ export default function AppLayout() {
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-gradient-to-r from-blue-800 to-blue-900 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
+                `flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
+                  ? 'bg-gradient-to-r from-blue-800 to-blue-900 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
                 }`
               }
             >

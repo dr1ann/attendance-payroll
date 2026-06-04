@@ -1,12 +1,14 @@
 import express from 'express'
 import cors from 'cors'
 import { authRouter } from './routes/auth.js'
+import { reportsRouter } from './routes/reports.js'
 import { departmentsRouter } from './routes/departments.js'
 import { teachersRouter } from './routes/teachers.js'
 import { schedulesRouter } from './routes/schedules.js'
 import { settingsRouter } from './routes/settings.js'
-import { attendanceRouter } from './routes/attendance.js'
+import { attendanceRouter, publicAttendanceRouter } from './routes/attendance.js'
 import { salaryRouter } from './routes/salaryComputation.js'
+import { dashboardRouter } from './routes/dashboard.js'
 import { authenticateToken } from './middleware/auth.js'
 
 const app = express()
@@ -23,9 +25,12 @@ app.use('/api/auth', authRouter)
 app.use('/api/departments', authenticateToken, departmentsRouter)
 app.use('/api/teachers', authenticateToken, teachersRouter)
 app.use('/api/schedules', authenticateToken, schedulesRouter)
+app.use('/api/reports', authenticateToken, reportsRouter)
 app.use('/api/settings', authenticateToken, settingsRouter)
+app.use('/api/public/attendance', publicAttendanceRouter)
 app.use('/api/attendance', authenticateToken, attendanceRouter)
 app.use('/api/salary-computation', authenticateToken, salaryRouter)
+app.use('/api/dashboard', authenticateToken, dashboardRouter)
 
 app.use((err, _, res, next) => {
   void next
