@@ -3,6 +3,7 @@ import { apiRequest } from '../api'
 import { useAuth } from '../context/useAuth'
 import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
+import { days } from '../constants/days'
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -17,6 +18,29 @@ function formatTime(dateString) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatTimeSlot(time) {
+  if (!time) return '-'
+
+  const [h, m] = time.split(':')
+  const d = new Date()
+  d.setHours(Number(h), Number(m))
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatSchedule(record) {
+  if (record.teacher_type !== 'part_time') return '-'
+  if (!record.schedule_id) return '-'
+
+  const day = record.schedule_day_of_week === null || record.schedule_day_of_week === undefined
+    ? 'Fixed'
+    : days[record.schedule_day_of_week]
+  const subject = record.schedule_subject || 'No subject'
+  const start = formatTimeSlot(record.schedule_time_start)
+  const end = formatTimeSlot(record.schedule_time_end)
+
+  return `${day} - ${subject} (${start} - ${end})`
 }
 
 function getTodayDate() {
@@ -213,6 +237,7 @@ export default function AttendancePage() {
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Employee No</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Department</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Schedule</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Type</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                   </tr>
@@ -226,6 +251,7 @@ export default function AttendancePage() {
                         {record.last_name}, {record.first_name}
                       </td>
                       <td className="px-4 py-3">{record.department}</td>
+                      <td className="px-4 py-3 text-gray-700">{formatSchedule(record)}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium ${

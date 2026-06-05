@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import Modal from '../components/ui/Modal'
 import AppLogo from '../components/ui/AppLogo'
+import { days } from '../constants/days'
 import { EMPLOYEE_NO_HELP_TEXT, EMPLOYEE_NO_MAX_LENGTH, validateEmployeeNo } from '../constants/employeeNo'
 import { getEmployeeNoFromQr, getScannerQrBox } from '../constants/qrAttendance'
 import { shouldAcceptScan } from '../constants/scanGuard'
@@ -14,6 +15,28 @@ const SCANNER_CONFIG = {
   qrbox: getScannerQrBox,
   aspectRatio: 1.0,
   disableFlip: false,
+}
+
+function formatTimeSlot(time) {
+  if (!time) return '-'
+
+  const [h, m] = time.split(':')
+  const d = new Date()
+  d.setHours(Number(h), Number(m))
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatSchedule(schedule) {
+  if (!schedule) return '-'
+
+  const day = schedule.day_of_week === null || schedule.day_of_week === undefined
+    ? 'Fixed'
+    : days[schedule.day_of_week]
+  const subject = schedule.subject || 'No subject'
+  const start = formatTimeSlot(schedule.time_start)
+  const end = formatTimeSlot(schedule.time_end)
+
+  return `${day} - ${subject} (${start} - ${end})`
 }
 
 export default function TeacherScanPage() {
@@ -393,6 +416,9 @@ export default function TeacherScanPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
                 { label: 'Teacher', value: result.data.teacher.name },
+                ...(result.data.teacher.teacher_type === 'part_time' && result.data.schedule
+                  ? [{ label: 'Schedule', value: formatSchedule(result.data.schedule) }]
+                  : []),
                 { label: 'Type', value: result.data.scan_type === 'time_in' ? 'Time In' : 'Time Out' },
                 {
                   label: 'Status',

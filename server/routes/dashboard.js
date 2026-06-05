@@ -4,6 +4,8 @@ import { authorizeRoles } from '../middleware/auth.js'
 
 export const dashboardRouter = Router()
 
+const DEFAULT_TIMEZONE = 'Asia/Manila'
+
 /**
  * GET /api/dashboard/summary
  * Returns KPI data for the admin dashboard:
@@ -14,11 +16,7 @@ export const dashboardRouter = Router()
  * - This month's payroll totals (gross, net, deductions)
  */
 dashboardRouter.get('/summary', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
-  const [settings] = await query(
-    'SELECT timezone, late_deduction_amount, absence_deduction_amount FROM attendance_settings WHERE id = 1',
-  )
-
-  const timezone = settings?.timezone || 'Asia/Manila'
+  const timezone = DEFAULT_TIMEZONE
   const now = new Date()
   const todayDate = now.toLocaleDateString('en-CA', { timeZone: timezone })
 

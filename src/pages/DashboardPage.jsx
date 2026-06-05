@@ -323,7 +323,7 @@ export default function DashboardPage() {
                       to="/settings"
                       icon={<Icon name="settings" className="w-4 h-4" />}
                       label="Settings"
-                      description="Configure deductions & timezone"
+                      description="Configure attendance deductions"
                       accent="#6b7280"
                     />
                   </div>

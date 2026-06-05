@@ -6,6 +6,7 @@ export const attendanceRouter = Router()
 export const publicAttendanceRouter = Router()
 
 const EARLY_TIME_IN_WINDOW_MINUTES = 30
+const DEFAULT_TIMEZONE = 'Asia/Manila'
 
 /**
  * Get today's date in the configured timezone as YYYY-MM-DD
@@ -105,14 +106,15 @@ export function getAttendanceStatus(teacherType, schedule, currentTimeStr, scanT
 
 async function getTodayContext() {
   const [settings] = await query(
-    'SELECT late_grace_minutes, duplicate_scan_window_seconds, timezone FROM attendance_settings WHERE id = 1',
+    'SELECT late_grace_minutes, duplicate_scan_window_seconds FROM attendance_settings WHERE id = 1',
   )
 
   if (!settings) {
     return { error: { status: 500, message: 'Attendance settings not configured' } }
   }
 
-  const { timezone, duplicate_scan_window_seconds } = settings
+  const { duplicate_scan_window_seconds } = settings
+  const timezone = DEFAULT_TIMEZONE
   const todayDate = await getTodayDate(timezone)
   const dayOfWeek = new Date(todayDate).getDay()
 
@@ -301,7 +303,7 @@ publicAttendanceRouter.post('/scan', async (req, res) => {
   return res.status(201).json({
     message: 'Scan recorded successfully',
     attendance: {
-      teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}` },
+      teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}`, teacher_type: teacher.teacher_type },
       scan_type: scanType,
       scan_time: currentDateTime,
       status,
@@ -484,6 +486,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
       teacher: {
         id: teacher.id,
         name: `${teacher.first_name} ${teacher.last_name}`,
+        teacher_type: teacher.teacher_type,
       },
       scan_type: scanType,
       scan_time: currentDateTime,
@@ -534,9 +537,14 @@ attendanceRouter.get('/', authorizeRoles('admin', 'salary_viewer'), async (req, 
 
   let sql = `
     SELECT a.id, a.teacher_id, a.schedule_id, a.scan_time, a.scan_type, a.status, a.created_at,
-           t.employee_no, t.first_name, t.last_name, t.department
+           t.employee_no, t.first_name, t.last_name, t.department, t.teacher_type,
+           s.day_of_week AS schedule_day_of_week,
+           s.time_start AS schedule_time_start,
+           s.time_end AS schedule_time_end,
+           s.subject AS schedule_subject
     FROM attendance a
     JOIN teachers t ON t.id = a.teacher_id
+    LEFT JOIN schedules s ON s.id = a.schedule_id
     WHERE 1=1
   `
   const params = []
@@ -597,11 +605,7 @@ attendanceRouter.get('/teacher/:id', authorizeRoles('admin', 'salary_viewer'), a
 
 // GET /api/attendance/today - Get today's attendance summary
 attendanceRouter.get('/today', authorizeRoles('admin', 'salary_viewer'), async (req, res) => {
-  const [settings] = await query(
-    'SELECT timezone FROM attendance_settings WHERE id = 1',
-  )
-
-  const timezone = settings?.timezone || 'Asia/Manila'
+  const timezone = DEFAULT_TIMEZONE
   const todayDate = await getTodayDate(timezone)
 
   const rows = await query(

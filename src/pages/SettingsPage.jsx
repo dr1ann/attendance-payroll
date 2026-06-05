@@ -9,7 +9,6 @@ const defaults = {
   duplicate_scan_window_seconds: 30,
   late_deduction_amount: 0,
   absence_deduction_amount: 0,
-  timezone: 'Asia/Manila',
 }
 
 export default function SettingsPage() {
@@ -118,15 +117,6 @@ export default function SettingsPage() {
                 onChange={(event) =>
                   setSettings((prev) => ({ ...prev, absence_deduction_amount: event.target.value }))
                 }
-                disabled={!isAdmin}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-              Timezone
-              <input
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                value={settings.timezone}
-                onChange={(event) => setSettings((prev) => ({ ...prev, timezone: event.target.value }))}
                 disabled={!isAdmin}
               />
             </label>

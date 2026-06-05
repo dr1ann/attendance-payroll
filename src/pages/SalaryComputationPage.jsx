@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { apiRequest, getSalaryComputationSummary, getAttendanceSalaryBreakdown } from '../api'
+import { getSalaryComputationSummary, getAttendanceSalaryBreakdown } from '../api'
 import { useAuth } from '../context/useAuth'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
@@ -10,6 +10,21 @@ function formatDate(d) {
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   return `${yyyy}-${mm}-${dd}`
+}
+
+function formatScanTime(scanTime) {
+  if (!scanTime) return '-'
+
+  const date = new Date(scanTime)
+  if (Number.isNaN(date.getTime())) return scanTime
+
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function SalaryComputationPage() {
@@ -159,7 +174,7 @@ export default function SalaryComputationPage() {
                   ) : null}
                   {breakdown.attendance.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{r.scan_time}</td>
+                      <td className="px-4 py-3">{formatScanTime(r.scan_time)}</td>
                       <td className="px-4 py-3">{r.scan_type}</td>
                       <td className="px-4 py-3">{r.status}</td>
                     </tr>

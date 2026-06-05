@@ -457,9 +457,9 @@ function TardinessTab({ token, departments }) {
   )
 }
 
-// ─── Tab: Payroll Report ──────────────────────────────────────────────────────
+// ─── Tab: Salary Computation Report ───────────────────────────────────────────
 
-function PayrollTab({ token, departments }) {
+function SalaryComputationReportTab({ token, departments }) {
   const [dateFrom, setDateFrom] = useState(firstOfMonth())
   const [dateTo, setDateTo] = useState(today())
   const [dept, setDept] = useState('')
@@ -508,7 +508,7 @@ function PayrollTab({ token, departments }) {
       r.expected_sessions, r.attended_sessions, r.absences, r.late_count,
       r.gross_salary, r.late_deduction, r.absence_deduction, r.total_deductions, r.net_salary,
     ])
-    downloadCSV(`payroll_${dateFrom}_to_${dateTo}.csv`, toCSV(headers, rows))
+    downloadCSV(`salary_computation_${dateFrom}_to_${dateTo}.csv`, toCSV(headers, rows))
   }
 
   return (
@@ -556,7 +556,7 @@ function PayrollTab({ token, departments }) {
           <StatCard label="Teachers" value={totals.count} />
           <StatCard label="Total Gross" value={fmtMoney(totals.gross)} />
           <StatCard label="Total Deductions" value={fmtMoney(totals.deductions)} />
-          <StatCard label="Total Net Payout" value={fmtMoney(totals.net)} />
+          <StatCard label="Total Net Salary" value={fmtMoney(totals.net)} />
         </div>
       ) : null}
 
@@ -658,7 +658,7 @@ function PayrollTab({ token, departments }) {
 const TABS = [
   { id: 'attendance', label: 'Attendance Log', icon: 'history' },
   { id: 'tardiness', label: 'Tardiness', icon: 'clock' },
-  { id: 'payroll', label: 'Payroll', icon: 'calendar' },
+  { id: 'salary', label: 'Salary Computation', icon: 'calendar' },
 ]
 
 export default function ReportsPage() {
@@ -677,7 +677,7 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Reports &amp; Analytics</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Generate and export attendance, tardiness, and payroll reports</p>
+          <p className="text-sm text-gray-500 mt-0.5">Generate and export attendance, tardiness, and salary computation reports</p>
         </div>
       </div>
 
@@ -706,7 +706,7 @@ export default function ReportsPage() {
       ) : activeTab === 'tardiness' ? (
         <TardinessTab token={token} departments={departments} />
       ) : (
-        <PayrollTab token={token} departments={departments} />
+        <SalaryComputationReportTab token={token} departments={departments} />
       )}
     </section>
   )

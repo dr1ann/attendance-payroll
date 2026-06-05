@@ -4,10 +4,12 @@ import { authorizeRoles } from '../middleware/auth.js'
 
 export const settingsRouter = Router()
 
+const DEFAULT_TIMEZONE = 'Asia/Manila'
+
 settingsRouter.get('/attendance', authorizeRoles('admin', 'salary_viewer'), async (_, res) => {
   const rows = await query(
     `SELECT id, late_grace_minutes, duplicate_scan_window_seconds,
-            late_deduction_amount, absence_deduction_amount, timezone
+            late_deduction_amount, absence_deduction_amount
      FROM attendance_settings
      WHERE id = 1
      LIMIT 1`,
@@ -17,7 +19,7 @@ settingsRouter.get('/attendance', authorizeRoles('admin', 'salary_viewer'), asyn
     return res.status(404).json({ message: 'Attendance settings not found' })
   }
 
-  return res.json(rows[0])
+  return res.json({ ...rows[0], timezone: DEFAULT_TIMEZONE })
 })
 
 settingsRouter.put('/attendance', authorizeRoles('admin'), async (req, res) => {
@@ -26,15 +28,13 @@ settingsRouter.put('/attendance', authorizeRoles('admin'), async (req, res) => {
     duplicate_scan_window_seconds,
     late_deduction_amount,
     absence_deduction_amount,
-    timezone,
   } = req.body
 
   if (
     late_grace_minutes === undefined ||
     duplicate_scan_window_seconds === undefined ||
     late_deduction_amount === undefined ||
-    absence_deduction_amount === undefined ||
-    !timezone
+    absence_deduction_amount === undefined
   ) {
     return res.status(400).json({ message: 'All fields are required' })
   }
@@ -60,7 +60,7 @@ settingsRouter.put('/attendance', authorizeRoles('admin'), async (req, res) => {
       duplicate_scan_window_seconds,
       late_deduction_amount,
       absence_deduction_amount,
-      timezone,
+      DEFAULT_TIMEZONE,
     ],
   )
 

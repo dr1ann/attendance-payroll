@@ -5,6 +5,7 @@ import { useAuth } from '../context/useAuth'
 import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import Modal from '../components/ui/Modal'
+import { days } from '../constants/days'
 import { getEmployeeNoFromQr, getScannerQrBox } from '../constants/qrAttendance'
 
 const SCANNER_CONFIG = {
@@ -12,6 +13,28 @@ const SCANNER_CONFIG = {
   qrbox: getScannerQrBox,
   aspectRatio: 1.0,
   disableFlip: false,
+}
+
+function formatTimeSlot(time) {
+  if (!time) return '-'
+
+  const [h, m] = time.split(':')
+  const d = new Date()
+  d.setHours(Number(h), Number(m))
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatSchedule(schedule) {
+  if (!schedule) return '-'
+
+  const day = schedule.day_of_week === null || schedule.day_of_week === undefined
+    ? 'Fixed'
+    : days[schedule.day_of_week]
+  const subject = schedule.subject || 'No subject'
+  const start = formatTimeSlot(schedule.time_start)
+  const end = formatTimeSlot(schedule.time_end)
+
+  return `${day} - ${subject} (${start} - ${end})`
 }
 
 export default function ScanPage() {
@@ -289,6 +312,12 @@ export default function ScanPage() {
                 <span className="text-green-700">Teacher</span>
                 <span className="font-medium text-green-800">{result.data.teacher.name}</span>
               </div>
+              {result.data.teacher.teacher_type === 'part_time' && result.data.schedule ? (
+                <div className="flex justify-between gap-4 text-sm">
+                  <span className="text-green-700">Schedule</span>
+                  <span className="font-medium text-green-800 text-right">{formatSchedule(result.data.schedule)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between text-sm">
                 <span className="text-green-700">Type</span>
                 <span className="font-medium text-green-800">
