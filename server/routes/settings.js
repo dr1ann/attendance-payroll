@@ -6,7 +6,7 @@ export const settingsRouter = Router()
 
 settingsRouter.get('/attendance', authorizeRoles('admin', 'salary_viewer'), async (_, res) => {
   const rows = await query(
-    `SELECT id, late_grace_minutes, duplicate_scan_window_minutes,
+    `SELECT id, late_grace_minutes, duplicate_scan_window_seconds,
             late_deduction_amount, absence_deduction_amount, timezone
      FROM attendance_settings
      WHERE id = 1
@@ -23,7 +23,7 @@ settingsRouter.get('/attendance', authorizeRoles('admin', 'salary_viewer'), asyn
 settingsRouter.put('/attendance', authorizeRoles('admin'), async (req, res) => {
   const {
     late_grace_minutes,
-    duplicate_scan_window_minutes,
+    duplicate_scan_window_seconds,
     late_deduction_amount,
     absence_deduction_amount,
     timezone,
@@ -31,7 +31,7 @@ settingsRouter.put('/attendance', authorizeRoles('admin'), async (req, res) => {
 
   if (
     late_grace_minutes === undefined ||
-    duplicate_scan_window_minutes === undefined ||
+    duplicate_scan_window_seconds === undefined ||
     late_deduction_amount === undefined ||
     absence_deduction_amount === undefined ||
     !timezone
@@ -41,7 +41,7 @@ settingsRouter.put('/attendance', authorizeRoles('admin'), async (req, res) => {
 
   const numericFields = [
     Number(late_grace_minutes),
-    Number(duplicate_scan_window_minutes),
+    Number(duplicate_scan_window_seconds),
     Number(late_deduction_amount),
     Number(absence_deduction_amount),
   ]
@@ -52,12 +52,12 @@ settingsRouter.put('/attendance', authorizeRoles('admin'), async (req, res) => {
 
   await query(
     `UPDATE attendance_settings
-     SET late_grace_minutes = ?, duplicate_scan_window_minutes = ?,
+     SET late_grace_minutes = ?, duplicate_scan_window_seconds = ?,
          late_deduction_amount = ?, absence_deduction_amount = ?, timezone = ?
      WHERE id = 1`,
     [
       late_grace_minutes,
-      duplicate_scan_window_minutes,
+      duplicate_scan_window_seconds,
       late_deduction_amount,
       absence_deduction_amount,
       timezone,

@@ -114,7 +114,7 @@ The system now has working backend and frontend modules for:
 
 - `id` (singleton = 1)
 - `late_grace_minutes`
-- `duplicate_scan_window_minutes`
+- `duplicate_scan_window_seconds`
 - `late_deduction_amount`
 - `absence_deduction_amount`
 - `timezone`

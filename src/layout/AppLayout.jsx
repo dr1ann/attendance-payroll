@@ -11,10 +11,10 @@ const adminNav = [
   { label: 'Dashboard', to: '/', icon: 'dashboard' },
   { label: 'Attendance', to: '/attendance', icon: 'history' },
   { label: 'Salary Computation', to: '/salary-computation', icon: 'calendar' },
-  { label: 'Reports', to: '/reports', icon: 'save' },
   { label: 'Teachers', to: '/teachers', icon: 'users' },
   { label: 'Departments', to: '/departments', icon: 'users' },
   { label: 'Schedules', to: '/schedules', icon: 'clock' },
+    { label: 'Reports', to: '/reports', icon: 'chart' },
   { label: 'Settings', to: '/settings', icon: 'settings' },
 ]
 

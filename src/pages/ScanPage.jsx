@@ -5,11 +5,13 @@ import { useAuth } from '../context/useAuth'
 import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import Modal from '../components/ui/Modal'
+import { getEmployeeNoFromQr, getScannerQrBox } from '../constants/qrAttendance'
 
 const SCANNER_CONFIG = {
-  fps: 10,
-  qrbox: { width: 250, height: 250 },
+  fps: 15,
+  qrbox: getScannerQrBox,
   aspectRatio: 1.0,
+  disableFlip: false,
 }
 
 export default function ScanPage() {
@@ -105,7 +107,8 @@ export default function ScanPage() {
   )
 
   const handleScanFlow = useCallback(
-    async (employeeNo) => {
+    async (rawEmployeeNo) => {
+      const employeeNo = getEmployeeNoFromQr(rawEmployeeNo)
       if (!employeeNo) return
 
       // Fetch schedules for today and prompt if more than one
@@ -113,6 +116,15 @@ export default function ScanPage() {
       if (!data) return
 
       const todaysSchedules = data.schedules || []
+
+      if (todaysSchedules.length === 0) {
+        setError('No schedule found for this teacher today')
+        setResult({
+          success: false,
+          message: 'No schedule found for this teacher today',
+        })
+        return
+      }
 
       if (todaysSchedules.length <= 1) {
         const scheduleId = todaysSchedules[0]?.id || null
@@ -154,7 +166,7 @@ export default function ScanPage() {
     } catch (err) {
       setError(`Camera error: ${err.message || 'Unable to access camera'}`)
     }
-  }, [isAdmin, processScan])
+  }, [handleScanFlow, isAdmin])
 
   useEffect(() => {
     return () => {
@@ -328,7 +340,7 @@ export default function ScanPage() {
           {scheduleLoading ? (
             <p className="text-sm text-gray-600">Loading schedules...</p>
           ) : scheduleOptions.length === 0 ? (
-            <p className="text-sm text-gray-600">No schedules for today. Proceeding will record without a schedule.</p>
+            <p className="text-sm text-red-600">No schedule found for this teacher today.</p>
           ) : (
             <div className="space-y-2">
               {scheduleOptions.map((opt) => {
@@ -344,7 +356,8 @@ export default function ScanPage() {
                         : 'border-gray-200 hover:border-blue-200 text-gray-800'
                     }`}
                   >
-                    <span>
+                    <span className="text-left">
+                      {opt.subject ? `${opt.subject} - ` : ''}
                       {opt.time_start} - {opt.time_end}
                     </span>
                     {selected ? <Icon name="check" className="w-4 h-4" /> : null}

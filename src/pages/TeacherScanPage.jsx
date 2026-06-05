@@ -5,11 +5,15 @@ import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import Modal from '../components/ui/Modal'
 import AppLogo from '../components/ui/AppLogo'
+import { EMPLOYEE_NO_HELP_TEXT, EMPLOYEE_NO_MAX_LENGTH, validateEmployeeNo } from '../constants/employeeNo'
+import { getEmployeeNoFromQr, getScannerQrBox } from '../constants/qrAttendance'
+import { shouldAcceptScan } from '../constants/scanGuard'
 
 const SCANNER_CONFIG = {
-  fps: 10,
-  qrbox: { width: 250, height: 250 },
+  fps: 15,
+  qrbox: getScannerQrBox,
   aspectRatio: 1.0,
+  disableFlip: false,
 }
 
 export default function TeacherScanPage() {
@@ -24,9 +28,12 @@ export default function TeacherScanPage() {
   const [pendingEmployeeNo, setPendingEmployeeNo] = useState('')
   const [scheduleLoading, setScheduleLoading] = useState(false)
   const [scheduleError, setScheduleError] = useState('')
+  const [manualInputError, setManualInputError] = useState('')
 
   const scannerRef = useRef(null)
   const html5QrCodeRef = useRef(null)
+  const scanFlowActiveRef = useRef(false)
+  const lastScanRef = useRef({ value: '', scannedAt: 0 })
 
   const stopScanner = useCallback(async () => {
     if (html5QrCodeRef.current?.isScanning) {
@@ -65,19 +72,25 @@ export default function TeacherScanPage() {
         })
       } finally {
         setProcessing(false)
+        scanFlowActiveRef.current = false
         setScheduleModalOpen(false)
         setPendingEmployeeNo('')
         setScheduleSelection(null)
         setScheduleOptions([])
+        setScheduleError('')
       }
     },
     [processing],
   )
 
   const confirmScheduleChoice = useCallback(() => {
-    if (!pendingEmployeeNo || !scheduleSelection) return
+    if (!pendingEmployeeNo) return
+    if (scheduleOptions.length > 0 && !scheduleSelection) {
+      setScheduleError('Select a schedule before continuing')
+      return
+    }
     processScan(pendingEmployeeNo, scheduleSelection)
-  }, [pendingEmployeeNo, processScan, scheduleSelection])
+  }, [pendingEmployeeNo, processScan, scheduleOptions.length, scheduleSelection])
 
   const loadSchedulesForToday = useCallback(async (employeeNo) => {
     setScheduleLoading(true)
@@ -89,6 +102,11 @@ export default function TeacherScanPage() {
       return data
     } catch (err) {
       setScheduleError(err.message)
+      setError(err.message)
+      setResult({
+        success: false,
+        message: err.message,
+      })
       return null
     } finally {
       setScheduleLoading(false)
@@ -96,13 +114,48 @@ export default function TeacherScanPage() {
   }, [])
 
   const handleScanFlow = useCallback(
-    async (employeeNo) => {
-      if (!employeeNo) return
+    async (rawEmployeeNo) => {
+      const scannedEmployeeNo = getEmployeeNoFromQr(rawEmployeeNo)
+      const validation = validateEmployeeNo(scannedEmployeeNo)
+
+      if (validation.error) {
+        setError(validation.error)
+        setResult({
+          success: false,
+          message: validation.error,
+        })
+        return
+      }
+
+      const employeeNo = validation.value
+      const now = Date.now()
+
+      if (!shouldAcceptScan(employeeNo, scanFlowActiveRef.current, lastScanRef.current, now)) {
+        return
+      }
+
+      scanFlowActiveRef.current = true
+      lastScanRef.current = { value: employeeNo, scannedAt: now }
+      setManualInputError('')
 
       const data = await loadSchedulesForToday(employeeNo)
-      if (!data) return
+      if (!data) {
+        scanFlowActiveRef.current = false
+        return
+      }
 
       const todaysSchedules = data.schedules || []
+
+      if (todaysSchedules.length === 0) {
+        const message = 'No schedule found for this teacher today'
+        setError(message)
+        setResult({
+          success: false,
+          message,
+        })
+        scanFlowActiveRef.current = false
+        return
+      }
 
       if (todaysSchedules.length <= 1) {
         const scheduleId = todaysSchedules[0]?.id || null
@@ -156,10 +209,22 @@ export default function TeacherScanPage() {
 
   const handleManualSubmit = (event) => {
     event.preventDefault()
-    if (manualInput.trim()) {
-      handleScanFlow(manualInput.trim())
-      setManualInput('')
+
+    const validation = validateEmployeeNo(manualInput)
+
+    if (validation.error) {
+      setManualInputError(validation.error)
+      setError(validation.error)
+      setResult({
+        success: false,
+        message: validation.error,
+      })
+      return
     }
+
+    setManualInputError('')
+    handleScanFlow(validation.value)
+    setManualInput('')
   }
 
   const clearResult = () => {
@@ -171,6 +236,9 @@ export default function TeacherScanPage() {
     setScheduleModalOpen(false)
     setPendingEmployeeNo('')
     setScheduleSelection(null)
+    setScheduleOptions([])
+    setScheduleError('')
+    scanFlowActiveRef.current = false
   }
 
   return (
@@ -286,16 +354,37 @@ export default function TeacherScanPage() {
           <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '8px' }}>
             <input
               id="teacher-scan-manual-input"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${manualInputError
+                ? 'border-red-300 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-blue-500'
+                }`}
               placeholder="Enter employee number"
               value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
+              onChange={(e) => {
+                setManualInput(e.target.value)
+                if (manualInputError) {
+                  setManualInputError('')
+                }
+              }}
               disabled={processing}
+              maxLength={EMPLOYEE_NO_MAX_LENGTH + 1}
+              aria-invalid={Boolean(manualInputError)}
+              aria-describedby="teacher-scan-manual-help"
             />
             <Button type="submit" disabled={processing || !manualInput.trim()}>
               Submit
             </Button>
           </form>
+          <p
+            id="teacher-scan-manual-help"
+            style={{
+              margin: '8px 0 0',
+              fontSize: '12px',
+              color: manualInputError ? '#dc2626' : '#64748b',
+            }}
+          >
+            {manualInputError || `${EMPLOYEE_NO_MAX_LENGTH} characters max. ${EMPLOYEE_NO_HELP_TEXT}`}
+          </p>
         </div>
 
         {/* Success detail */}
@@ -349,7 +438,7 @@ export default function TeacherScanPage() {
           {scheduleLoading ? (
             <p className="text-sm text-gray-600">Loading schedules...</p>
           ) : scheduleOptions.length === 0 ? (
-            <p className="text-sm text-gray-600">No schedules for today. Proceeding will record without a schedule.</p>
+            <p className="text-sm text-red-600">No schedule found for this teacher today.</p>
           ) : (
             <div className="space-y-2">
               {scheduleOptions.map((opt) => {
@@ -362,9 +451,10 @@ export default function TeacherScanPage() {
                     className={`w-full flex items-center justify-between px-3 py-2 rounded border text-sm ${selected
                       ? 'border-blue-500 bg-blue-50 text-blue-800'
                       : 'border-gray-200 hover:border-blue-200 text-gray-800'
-                      }`}
+                    }`}
                   >
-                    <span>
+                    <span className="text-left">
+                      {opt.subject ? `${opt.subject} - ` : ''}
                       {opt.time_start} - {opt.time_end}
                     </span>
                     {selected ? <Icon name="check" className="w-4 h-4" /> : null}

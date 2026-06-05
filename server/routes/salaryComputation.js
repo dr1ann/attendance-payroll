@@ -40,14 +40,17 @@ function mapTeacherSchedules(schedules) {
 
   for (const row of schedules) {
     const list = byTeacher.get(row.teacher_id) || []
-    list.push({ id: row.id, day_of_week: Number(row.day_of_week) })
+    list.push({
+      id: row.id,
+      day_of_week: row.day_of_week === null || row.day_of_week === undefined ? null : Number(row.day_of_week),
+    })
     byTeacher.set(row.teacher_id, list)
   }
 
   return byTeacher
 }
 
-function computeExpectedSessions(scheduleRows, start, end) {
+function computeExpectedSessions(scheduleRows, start, end, teacherType) {
   if (!scheduleRows || scheduleRows.length === 0) return 0
 
   const dates = getDatesInRange(start, end)
@@ -55,31 +58,42 @@ function computeExpectedSessions(scheduleRows, start, end) {
 
   for (const date of dates) {
     const dayOfWeek = date.getDay()
-    expectedSessions += scheduleRows.filter((s) => s.day_of_week === dayOfWeek).length
+    expectedSessions += scheduleRows.filter((s) => {
+      if (teacherType === 'full_time' && s.day_of_week === null) {
+        return true
+      }
+
+      return s.day_of_week === dayOfWeek
+    }).length
   }
 
   return expectedSessions
 }
 
-function computeAttendanceStats(attendanceRows) {
-  const rowsByDate = new Map()
+export function computeAttendanceStats(attendanceRows, teacherType = 'full_time') {
+  const rowsBySession = new Map()
 
   for (const row of attendanceRows) {
     const date = String(row.scan_time).slice(0, 10)
-    const list = rowsByDate.get(date) || []
+    const sessionKey = row.schedule_id ? `${date}:${row.schedule_id}` : `${date}:no_schedule`
+    const list = rowsBySession.get(sessionKey) || []
     list.push(row)
-    rowsByDate.set(date, list)
+    rowsBySession.set(sessionKey, list)
   }
 
   let attendedSessions = 0
   let lateCount = 0
 
-  for (const rows of rowsByDate.values()) {
+  for (const rows of rowsBySession.values()) {
     rows.sort((a, b) => new Date(a.scan_time) - new Date(b.scan_time))
 
     const hasTimeIn = rows.some((r) => r.scan_type === 'time_in')
     const hasTimeOut = rows.some((r) => r.scan_type === 'time_out')
-    if (hasTimeIn && hasTimeOut) attendedSessions += 1
+    if (teacherType === 'part_time') {
+      if (hasTimeIn) attendedSessions += 1
+    } else if (hasTimeIn && hasTimeOut) {
+      attendedSessions += 1
+    }
 
     const lateTimeIns = rows.filter((r) => r.scan_type === 'time_in' && r.status === 'late').length
     lateCount += lateTimeIns
@@ -88,7 +102,7 @@ function computeAttendanceStats(attendanceRows) {
   return { attendedSessions, lateCount }
 }
 
-function computeSalaryForTeacher(teacher, periodStats, settings) {
+export function computeSalaryForTeacher(teacher, periodStats, settings) {
   const grossSalary =
     teacher.teacher_type === 'full_time'
       ? Number(teacher.monthly_salary || 0)
@@ -144,7 +158,7 @@ salaryRouter.get('/summary', authorizeRoles('admin', 'salary_viewer'), async (re
   )
 
   const attendance = await query(
-    `SELECT id, teacher_id, scan_time, scan_type, status
+    `SELECT id, teacher_id, schedule_id, scan_time, scan_type, status
      FROM attendance
      WHERE DATE(scan_time) >= ? AND DATE(scan_time) <= ?
      ORDER BY scan_time ASC`,
@@ -162,9 +176,9 @@ salaryRouter.get('/summary', authorizeRoles('admin', 'salary_viewer'), async (re
 
   const summary = teachers.map((teacher) => {
     const teacherSchedules = schedulesByTeacher.get(teacher.id) || []
-    const expectedSessions = computeExpectedSessions(teacherSchedules, start, end)
+    const expectedSessions = computeExpectedSessions(teacherSchedules, start, end, teacher.teacher_type)
     const teacherAttendance = attendanceByTeacher.get(teacher.id) || []
-    const stats = computeAttendanceStats(teacherAttendance)
+    const stats = computeAttendanceStats(teacherAttendance, teacher.teacher_type)
     const absenceCount = Math.max(0, expectedSessions - stats.attendedSessions)
 
     const salary = computeSalaryForTeacher(

@@ -8,10 +8,12 @@
     "dev:server": "node --watch server/server.js",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
+    "test": "node --test \"src/**/*.test.js\" \"server/**/*.test.js\"",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/server.js",
-    "db:init": "node server/scripts/initDb.js"
+    "db:init": "node server/scripts/initDb.js",
+    "db:clear:data": "node server/scripts/clearDbData.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

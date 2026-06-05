@@ -139,13 +139,50 @@ async function init() {
     CREATE TABLE IF NOT EXISTS schedules (
       id INT PRIMARY KEY AUTO_INCREMENT,
       teacher_id INT NOT NULL,
-      day_of_week TINYINT NOT NULL,
+      day_of_week TINYINT NULL,
       time_start TIME NOT NULL,
       time_end TIME NOT NULL,
+      subject VARCHAR(150) NULL,
       CONSTRAINT fk_schedules_teacher
         FOREIGN KEY (teacher_id) REFERENCES teachers(id)
         ON DELETE CASCADE
     )
+  `)
+
+  await connection.query(`
+    ALTER TABLE schedules
+    MODIFY COLUMN day_of_week TINYINT NULL
+  `)
+
+  const [scheduleSubjectCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'schedules' AND COLUMN_NAME = 'subject'`,
+    [dbName],
+  )
+
+  if (scheduleSubjectCols.length === 0) {
+    await connection.query(`
+      ALTER TABLE schedules
+      ADD COLUMN subject VARCHAR(150) NULL
+      AFTER time_end
+    `)
+  }
+
+  await connection.query(`
+    DELETE s FROM schedules s
+    JOIN teachers t ON t.id = s.teacher_id
+    JOIN schedules keep_schedule
+      ON keep_schedule.teacher_id = s.teacher_id
+      AND keep_schedule.id < s.id
+    WHERE t.teacher_type = 'full_time'
+  `)
+
+  await connection.query(`
+    UPDATE schedules s
+    JOIN teachers t ON t.id = s.teacher_id
+    SET s.day_of_week = NULL,
+        s.subject = NULL
+    WHERE t.teacher_type = 'full_time'
   `)
 
   const [scheduleGraceCols] = await connection.query(
@@ -162,12 +199,43 @@ async function init() {
     CREATE TABLE IF NOT EXISTS attendance_settings (
       id INT PRIMARY KEY,
       late_grace_minutes INT NOT NULL DEFAULT 15,
-      duplicate_scan_window_minutes INT NOT NULL DEFAULT 5,
+      duplicate_scan_window_seconds INT NOT NULL DEFAULT 30,
       late_deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
       absence_deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
       timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Manila'
     )
   `)
+
+  const [duplicateWindowSecondsCols] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_settings' AND COLUMN_NAME = 'duplicate_scan_window_seconds'`,
+    [dbName],
+  )
+
+  if (duplicateWindowSecondsCols.length === 0) {
+    await connection.query(`
+      ALTER TABLE attendance_settings
+      ADD COLUMN duplicate_scan_window_seconds INT NOT NULL DEFAULT 30
+      AFTER late_grace_minutes
+    `)
+
+    const [duplicateWindowMinutesCols] = await connection.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'attendance_settings' AND COLUMN_NAME = 'duplicate_scan_window_minutes'`,
+      [dbName],
+    )
+
+    if (duplicateWindowMinutesCols.length > 0) {
+      await connection.query(`
+        UPDATE attendance_settings
+        SET duplicate_scan_window_seconds =
+          CASE
+            WHEN duplicate_scan_window_minutes = 5 THEN 30
+            ELSE duplicate_scan_window_minutes * 60
+          END
+      `)
+    }
+  }
 
   const [lateDeductionCols] = await connection.query(
     `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
@@ -179,7 +247,7 @@ async function init() {
     await connection.query(`
       ALTER TABLE attendance_settings
       ADD COLUMN late_deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0
-      AFTER duplicate_scan_window_minutes
+      AFTER duplicate_scan_window_seconds
     `)
   }
 
@@ -201,12 +269,12 @@ async function init() {
     `INSERT IGNORE INTO attendance_settings (
       id,
       late_grace_minutes,
-      duplicate_scan_window_minutes,
+      duplicate_scan_window_seconds,
       late_deduction_amount,
       absence_deduction_amount,
       timezone
     )
-     VALUES (1, 15, 5, 0, 0, 'Asia/Manila')`,
+     VALUES (1, 15, 30, 0, 0, 'Asia/Manila')`,
   )
 
   await connection.query(`

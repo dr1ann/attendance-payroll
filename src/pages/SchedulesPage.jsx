@@ -12,7 +12,14 @@ const emptySchedule = {
   day_of_week: 1,
   time_start: '08:00',
   time_end: '17:00',
+  subject: '',
 }
+
+const getDefaultTimesForTeacherType = (teacherType) => (
+  teacherType === 'part_time'
+    ? { time_start: '08:00', time_end: '09:00' }
+    : { time_start: '08:00', time_end: '17:00' }
+)
 
 export default function SchedulesPage() {
   const { token, isAdmin } = useAuth()
@@ -28,9 +35,21 @@ export default function SchedulesPage() {
   const [formErrors, setFormErrors] = useState({})
 
   const teacherOptions = useMemo(
-    () => teachers.map((teacher) => ({ id: teacher.id, name: `${teacher.last_name}, ${teacher.first_name}` })),
+    () => teachers.map((teacher) => ({
+      id: teacher.id,
+      name: `${teacher.last_name}, ${teacher.first_name}`,
+      teacher_type: teacher.teacher_type,
+    })),
     [teachers],
   )
+
+  const selectedTeacher = useMemo(
+    () => teachers.find((teacher) => String(teacher.id) === String(scheduleForm.teacher_id)),
+    [scheduleForm.teacher_id, teachers],
+  )
+  const selectedTeacherType = selectedTeacher?.teacher_type || ''
+  const isFullTimeSchedule = selectedTeacherType === 'full_time'
+  const isPartTimeSchedule = selectedTeacherType === 'part_time'
 
   const filteredSchedules = useMemo(() => {
     if (!query.trim()) {
@@ -39,7 +58,14 @@ export default function SchedulesPage() {
 
     const search = query.toLowerCase()
     return schedules.filter((schedule) =>
-      [schedule.first_name, schedule.last_name, schedule.employee_no, days[schedule.day_of_week]]
+      [
+        schedule.first_name,
+        schedule.last_name,
+        schedule.employee_no,
+        schedule.teacher_type,
+        schedule.subject,
+        schedule.day_of_week === null || schedule.day_of_week === undefined ? 'Fixed' : days[schedule.day_of_week],
+      ]
         .join(' ')
         .toLowerCase()
         .includes(search),
@@ -70,8 +96,11 @@ export default function SchedulesPage() {
 
     const errs = {}
     if (!scheduleForm.teacher_id) errs.teacher_id = 'Teacher is required'
-    if (scheduleForm.day_of_week === '' || scheduleForm.day_of_week === null || scheduleForm.day_of_week === undefined) {
+    if (isPartTimeSchedule && (scheduleForm.day_of_week === '' || scheduleForm.day_of_week === null || scheduleForm.day_of_week === undefined)) {
       errs.day_of_week = 'Day is required'
+    }
+    if (isPartTimeSchedule && !scheduleForm.subject.trim()) {
+      errs.subject = 'Subject is required'
     }
     if (!scheduleForm.time_start) errs.time_start = 'Start time is required'
     if (!scheduleForm.time_end) errs.time_end = 'End time is required'
@@ -97,7 +126,8 @@ export default function SchedulesPage() {
           body: JSON.stringify({
             ...scheduleForm,
             teacher_id: Number(scheduleForm.teacher_id),
-            day_of_week: Number(scheduleForm.day_of_week),
+            day_of_week: isFullTimeSchedule ? null : Number(scheduleForm.day_of_week),
+            subject: isFullTimeSchedule ? null : scheduleForm.subject.trim(),
           }),
         },
         token,
@@ -168,7 +198,9 @@ export default function SchedulesPage() {
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Teacher</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600">Type</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Day</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600">Subject</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Start</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">End</th>
               {isAdmin ? <th className="px-4 py-3 text-left font-medium text-gray-600 w-[1%] whitespace-nowrap">Actions</th> : null}
@@ -177,13 +209,19 @@ export default function SchedulesPage() {
           <tbody className="divide-y divide-gray-100">
             {filteredSchedules.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin ? 5 : 4} className="px-4 py-8 text-center text-gray-500">No schedules found</td>
+                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-gray-500">No schedules found</td>
               </tr>
             ) : null}
             {filteredSchedules.map((schedule) => (
               <tr key={schedule.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">{schedule.last_name}, {schedule.first_name}</td>
-                <td className="px-4 py-3">{days[schedule.day_of_week]}</td>
+                <td className="px-4 py-3">
+                  {schedule.teacher_type === 'part_time' ? 'Part Time' : 'Full Time'}
+                </td>
+                <td className="px-4 py-3">
+                  {schedule.day_of_week === null || schedule.day_of_week === undefined ? 'Fixed' : days[schedule.day_of_week]}
+                </td>
+                <td className="px-4 py-3">{schedule.subject || '-'}</td>
                 <td className="px-4 py-3">{String(schedule.time_start).slice(0, 5)}</td>
                 <td className="px-4 py-3">{String(schedule.time_end).slice(0, 5)}</td>
                 {isAdmin ? (
@@ -193,9 +231,10 @@ export default function SchedulesPage() {
                         setEditScheduleId(schedule.id)
                         setScheduleForm({
                           teacher_id: String(schedule.teacher_id),
-                          day_of_week: schedule.day_of_week,
+                          day_of_week: schedule.day_of_week ?? 1,
                           time_start: String(schedule.time_start).slice(0, 5),
                           time_end: String(schedule.time_end).slice(0, 5),
+                          subject: schedule.subject || '',
                         })
                         setFormOpen(true)
                       }}
@@ -228,12 +267,22 @@ export default function SchedulesPage() {
             <select
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={scheduleForm.teacher_id}
-              onChange={(event) => setScheduleForm((prev) => ({ ...prev, teacher_id: event.target.value }))}
+              onChange={(event) => {
+                const teacher = teachers.find((row) => String(row.id) === event.target.value)
+                const defaultTimes = getDefaultTimesForTeacherType(teacher?.teacher_type)
+                setScheduleForm((prev) => ({
+                  ...prev,
+                  teacher_id: event.target.value,
+                  day_of_week: teacher?.teacher_type === 'full_time' ? 1 : prev.day_of_week,
+                  subject: teacher?.teacher_type === 'full_time' ? '' : prev.subject,
+                  ...defaultTimes,
+                }))
+              }}
             >
               <option value="">Select teacher</option>
               {teacherOptions.map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.name}
+                  {option.name} ({option.teacher_type === 'part_time' ? 'Part Time' : 'Full Time'})
                 </option>
               ))}
             </select>
@@ -241,23 +290,44 @@ export default function SchedulesPage() {
               <span className="text-xs text-red-600">{formErrors.teacher_id}</span>
             ) : null}
           </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-            Day
-            <select
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={scheduleForm.day_of_week}
-              onChange={(event) => setScheduleForm((prev) => ({ ...prev, day_of_week: event.target.value }))}
-            >
-              {days.map((name, index) => (
-                <option key={name} value={index}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            {formErrors.day_of_week ? (
-              <span className="text-xs text-red-600">{formErrors.day_of_week}</span>
-            ) : null}
-          </label>
+          {isFullTimeSchedule ? (
+            <p className="text-sm text-gray-600">
+              Full-time teachers use one fixed daily shift. Only time in and time out will be recorded.
+            </p>
+          ) : null}
+          {isPartTimeSchedule ? (
+            <>
+              <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+                Day
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={scheduleForm.day_of_week}
+                  onChange={(event) => setScheduleForm((prev) => ({ ...prev, day_of_week: event.target.value }))}
+                >
+                  {days.map((name, index) => (
+                    <option key={name} value={index}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.day_of_week ? (
+                  <span className="text-xs text-red-600">{formErrors.day_of_week}</span>
+                ) : null}
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+                Subject
+                <input
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={scheduleForm.subject}
+                  onChange={(event) => setScheduleForm((prev) => ({ ...prev, subject: event.target.value }))}
+                  placeholder="Subject"
+                />
+                {formErrors.subject ? (
+                  <span className="text-xs text-red-600">{formErrors.subject}</span>
+                ) : null}
+              </label>
+            </>
+          ) : null}
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Start
             <input

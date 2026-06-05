@@ -4,6 +4,7 @@ import { apiRequest } from '../api'
 import { useAuth } from '../context/useAuth'
 import Icon from '../components/ui/Icon'
 import { days } from '../constants/days'
+import { QR_CODE_OPTIONS } from '../constants/qrAttendance'
 
 function formatTime(dateString) {
   return new Date(dateString).toLocaleTimeString('en-US', {
@@ -74,7 +75,7 @@ export default function MyAttendancePage() {
     setQrDataUrl('')
     setQrError('')
 
-    QRCode.toDataURL(teacher.employee_no, { margin: 1, scale: 8 })
+    QRCode.toDataURL(teacher.employee_no, QR_CODE_OPTIONS)
       .then((url) => {
         if (!cancelled) {
           setQrDataUrl(url)
@@ -170,6 +171,7 @@ export default function MyAttendancePage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Day</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Subject</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Start</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">End</th>
                 </tr>
@@ -177,7 +179,10 @@ export default function MyAttendancePage() {
               <tbody className="divide-y divide-gray-100">
                 {schedule.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{days[s.day_of_week]}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {s.day_of_week === null || s.day_of_week === undefined ? 'Fixed' : days[s.day_of_week]}
+                    </td>
+                    <td className="px-4 py-3">{s.subject || '-'}</td>
                     <td className="px-4 py-3">{formatTimeSlot(s.time_start)}</td>
                     <td className="px-4 py-3">{formatTimeSlot(s.time_end)}</td>
                   </tr>

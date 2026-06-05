@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
 import ActionButtons from '../components/ui/ActionButtons'
 import Icon from '../components/ui/Icon'
+import { QR_CODE_OPTIONS } from '../constants/qrAttendance'
 
 const emptyTeacher = {
   employee_no: '',
@@ -83,7 +84,7 @@ export default function TeachersPage() {
     setQrDataUrl('')
     setQrError('')
 
-    QRCode.toDataURL(qrTarget.employee_no, { margin: 1, scale: 8 })
+    QRCode.toDataURL(qrTarget.employee_no, QR_CODE_OPTIONS)
       .then((url) => {
         if (!cancelled) {
           setQrDataUrl(url)

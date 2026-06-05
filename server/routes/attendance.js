@@ -5,6 +5,8 @@ import { authorizeRoles } from '../middleware/auth.js'
 export const attendanceRouter = Router()
 export const publicAttendanceRouter = Router()
 
+const EARLY_TIME_IN_WINDOW_MINUTES = 30
+
 /**
  * Get today's date in the configured timezone as YYYY-MM-DD
  */
@@ -34,12 +36,12 @@ function getCurrentDateTime(timezone) {
 /**
  * Convert time string (HH:MM:SS) to minutes since midnight
  */
-function timeToMinutes(timeStr) {
+export function timeToMinutes(timeStr) {
   const [hours, minutes] = timeStr.split(':').map(Number)
   return hours * 60 + minutes
 }
 
-function selectSchedule(currentTimeStr, todaysSchedules) {
+export function selectSchedule(currentTimeStr, todaysSchedules) {
   if (!todaysSchedules || todaysSchedules.length === 0) return null
 
   const nowMinutes = timeToMinutes(currentTimeStr)
@@ -60,16 +62,57 @@ function selectSchedule(currentTimeStr, todaysSchedules) {
   return todaysSchedules[todaysSchedules.length - 1]
 }
 
+export function getScheduleValidation(teacherType, schedule, currentTimeStr, scanType) {
+  if (!schedule) {
+    return { error: 'No schedule found for this teacher today' }
+  }
+
+  if (scanType !== 'time_in') {
+    return { error: '' }
+  }
+
+  const currentMinutes = timeToMinutes(currentTimeStr)
+  const scheduleStartMinutes = timeToMinutes(schedule.time_start)
+  const earliestTimeInMinutes = scheduleStartMinutes - EARLY_TIME_IN_WINDOW_MINUTES
+
+  if (currentMinutes < earliestTimeInMinutes) {
+    return {
+      error: `Time in is only allowed ${EARLY_TIME_IN_WINDOW_MINUTES} minutes before the scheduled start time`,
+    }
+  }
+
+  if (teacherType === 'part_time') {
+    const scheduleEndMinutes = timeToMinutes(schedule.time_end)
+
+    if (currentMinutes > scheduleEndMinutes) {
+      return { error: 'Part-time attendance can only be recorded during the scheduled time frame' }
+    }
+  }
+
+  return { error: '' }
+}
+
+export function getAttendanceStatus(teacherType, schedule, currentTimeStr, scanType) {
+  if (scanType !== 'time_in' || !schedule || teacherType !== 'full_time') {
+    return 'on_time'
+  }
+
+  const currentMinutes = timeToMinutes(currentTimeStr)
+  const scheduleStartMinutes = timeToMinutes(schedule.time_start)
+
+  return currentMinutes > scheduleStartMinutes ? 'late' : 'on_time'
+}
+
 async function getTodayContext() {
   const [settings] = await query(
-    'SELECT late_grace_minutes, duplicate_scan_window_minutes, timezone FROM attendance_settings WHERE id = 1',
+    'SELECT late_grace_minutes, duplicate_scan_window_seconds, timezone FROM attendance_settings WHERE id = 1',
   )
 
   if (!settings) {
     return { error: { status: 500, message: 'Attendance settings not configured' } }
   }
 
-  const { timezone, duplicate_scan_window_minutes } = settings
+  const { timezone, duplicate_scan_window_seconds } = settings
   const todayDate = await getTodayDate(timezone)
   const dayOfWeek = new Date(todayDate).getDay()
 
@@ -77,7 +120,7 @@ async function getTodayContext() {
     settings,
     timezone,
     lateGraceMinutes: Number(settings.late_grace_minutes || 0),
-    duplicate_scan_window_minutes,
+    duplicate_scan_window_seconds,
     todayDate,
     dayOfWeek,
   }
@@ -126,14 +169,14 @@ publicAttendanceRouter.get('/today-schedules', async (req, res) => {
   }
 
   const schedules = await query(
-    `SELECT id, time_start, time_end FROM schedules 
-     WHERE teacher_id = ? AND day_of_week = ?
+    `SELECT id, day_of_week, time_start, time_end, subject FROM schedules 
+     WHERE teacher_id = ? AND (day_of_week = ? OR (? = 'full_time' AND day_of_week IS NULL))
      ORDER BY time_start ASC`,
-    [teacher.id, dayOfWeek],
+    [teacher.id, dayOfWeek, teacher.teacher_type],
   )
 
   return res.json({
-    teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}` },
+    teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}`, teacher_type: teacher.teacher_type },
     timezone,
     todayDate,
     dayOfWeek,
@@ -155,7 +198,7 @@ publicAttendanceRouter.post('/scan', async (req, res) => {
     return res.status(context.error.status).json({ message: context.error.message })
   }
 
-  const { timezone, duplicate_scan_window_minutes, lateGraceMinutes, todayDate, dayOfWeek } = context
+  const { timezone, duplicate_scan_window_seconds, todayDate, dayOfWeek } = context
 
   const [teacher] = await query(
     'SELECT id, first_name, last_name, status, teacher_type FROM teachers WHERE employee_no = ?',
@@ -179,10 +222,10 @@ publicAttendanceRouter.post('/scan', async (req, res) => {
   const duplicateWindow = await query(
     `SELECT id, scan_type, scan_time FROM attendance 
      WHERE teacher_id = ? 
-     AND scan_time > DATE_SUB(?, INTERVAL ? MINUTE)
+     AND scan_time > DATE_SUB(?, INTERVAL ? SECOND)
      ORDER BY scan_time DESC
      LIMIT 1`,
-    [teacher.id, currentDateTime, duplicate_scan_window_minutes],
+    [teacher.id, currentDateTime, duplicate_scan_window_seconds],
   )
 
   if (duplicateWindow.length > 0) {
@@ -190,38 +233,28 @@ publicAttendanceRouter.post('/scan', async (req, res) => {
     return res.status(400).json({
       message: 'Duplicate scan detected',
       lastScan: { type: lastScan.scan_type, time: lastScan.scan_time },
-      windowMinutes: duplicate_scan_window_minutes,
+      windowSeconds: duplicate_scan_window_seconds,
     })
   }
 
   const schedules = await query(
-    `SELECT id, time_start, time_end FROM schedules 
-     WHERE teacher_id = ? AND day_of_week = ?
+    `SELECT id, day_of_week, time_start, time_end, subject FROM schedules 
+     WHERE teacher_id = ? AND (day_of_week = ? OR (? = 'full_time' AND day_of_week IS NULL))
      ORDER BY time_start ASC`,
-    [teacher.id, dayOfWeek],
+    [teacher.id, dayOfWeek, teacher.teacher_type],
   )
 
+  if (schedules.length === 0) {
+    return res.status(400).json({ message: 'No schedule found for this teacher today' })
+  }
+
   const todayScans = await query(
-    `SELECT scan_type FROM attendance 
+    `SELECT scan_type, schedule_id FROM attendance
      WHERE teacher_id = ? AND DATE(scan_time) = ?
      ORDER BY scan_time DESC`,
     [teacher.id, todayDate],
   )
 
-  const hasTimeIn = todayScans.some(s => s.scan_type === 'time_in')
-  const hasTimeOut = todayScans.some(s => s.scan_type === 'time_out')
-  if (hasTimeIn && hasTimeOut) {
-    return res.status(400).json({
-      message: 'Attendance already recorded for today (time in and out)',
-    })
-  }
-
-  let scanType = 'time_in'
-  if (todayScans.length > 0) {
-    scanType = todayScans[0].scan_type === 'time_in' ? 'time_out' : 'time_in'
-  }
-
-  let status = 'on_time'
   let schedule = selectSchedule(currentTime, schedules)
 
   if (schedule_id) {
@@ -232,19 +265,37 @@ publicAttendanceRouter.post('/scan', async (req, res) => {
     schedule = match
   }
 
-  if (scanType === 'time_in' && schedule) {
-    const currentMinutes = timeToMinutes(currentTime)
-    const scheduleStartMinutes = timeToMinutes(schedule.time_start)
-    const graceMinutes = teacher.teacher_type === 'full_time' ? 0 : lateGraceMinutes
-    if (currentMinutes > scheduleStartMinutes + graceMinutes) {
-      status = 'late'
-    }
+  const scheduleScans = todayScans.filter((scan) => scan.schedule_id === schedule.id)
+  const hasTimeIn = scheduleScans.some(s => s.scan_type === 'time_in')
+  const hasTimeOut = scheduleScans.some(s => s.scan_type === 'time_out')
+  if (teacher.teacher_type === 'part_time' && hasTimeIn) {
+    return res.status(400).json({
+      message: 'Attendance already recorded for this part-time schedule today',
+    })
   }
+
+  if (hasTimeIn && hasTimeOut) {
+    return res.status(400).json({
+      message: 'Attendance already recorded for this schedule today (time in and out)',
+    })
+  }
+
+  let scanType = 'time_in'
+  if (scheduleScans.length > 0) {
+    scanType = scheduleScans[0].scan_type === 'time_in' ? 'time_out' : 'time_in'
+  }
+
+  const scheduleValidation = getScheduleValidation(teacher.teacher_type, schedule, currentTime, scanType)
+  if (scheduleValidation.error) {
+    return res.status(400).json({ message: scheduleValidation.error })
+  }
+
+  const status = getAttendanceStatus(teacher.teacher_type, schedule, currentTime, scanType)
 
   await query(
     `INSERT INTO attendance (teacher_id, schedule_id, scan_time, scan_type, status)
      VALUES (?, ?, ?, ?, ?)`,
-    [teacher.id, schedule?.id || null, currentDateTime, scanType, status],
+    [teacher.id, schedule.id, currentDateTime, scanType, status],
   )
 
   return res.status(201).json({
@@ -255,7 +306,7 @@ publicAttendanceRouter.post('/scan', async (req, res) => {
       scan_time: currentDateTime,
       status,
       schedule: schedule
-        ? { time_start: schedule.time_start, time_end: schedule.time_end }
+        ? { id: schedule.id, day_of_week: schedule.day_of_week, time_start: schedule.time_start, time_end: schedule.time_end, subject: schedule.subject }
         : null,
     },
   })
@@ -291,14 +342,14 @@ attendanceRouter.get('/today-schedules', authorizeRoles('admin'), async (req, re
   }
 
   const schedules = await query(
-    `SELECT id, time_start, time_end FROM schedules 
-     WHERE teacher_id = ? AND day_of_week = ?
+    `SELECT id, day_of_week, time_start, time_end, subject FROM schedules 
+     WHERE teacher_id = ? AND (day_of_week = ? OR (? = 'full_time' AND day_of_week IS NULL))
      ORDER BY time_start ASC`,
-    [teacher.id, dayOfWeek],
+    [teacher.id, dayOfWeek, teacher.teacher_type],
   )
 
   return res.json({
-    teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}` },
+    teacher: { id: teacher.id, name: `${teacher.first_name} ${teacher.last_name}`, teacher_type: teacher.teacher_type },
     timezone,
     todayDate,
     dayOfWeek,
@@ -319,7 +370,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
     return res.status(context.error.status).json({ message: context.error.message })
   }
 
-  const { timezone, duplicate_scan_window_minutes, lateGraceMinutes, todayDate, dayOfWeek } = context
+  const { timezone, duplicate_scan_window_seconds, todayDate, dayOfWeek } = context
 
   // Find the teacher
   const [teacher] = await query(
@@ -345,10 +396,10 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
   const duplicateWindow = await query(
     `SELECT id, scan_type, scan_time FROM attendance 
      WHERE teacher_id = ? 
-     AND scan_time > DATE_SUB(?, INTERVAL ? MINUTE)
+     AND scan_time > DATE_SUB(?, INTERVAL ? SECOND)
      ORDER BY scan_time DESC
      LIMIT 1`,
-    [teacher.id, currentDateTime, duplicate_scan_window_minutes],
+    [teacher.id, currentDateTime, duplicate_scan_window_seconds],
   )
 
   if (duplicateWindow.length > 0) {
@@ -359,43 +410,29 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
         type: lastScan.scan_type,
         time: lastScan.scan_time,
       },
-      windowMinutes: duplicate_scan_window_minutes,
+      windowSeconds: duplicate_scan_window_seconds,
     })
   }
 
   // Find matching schedules for today (could be multiple slots)
   const schedules = await query(
-    `SELECT id, time_start, time_end FROM schedules 
-     WHERE teacher_id = ? AND day_of_week = ?
+    `SELECT id, day_of_week, time_start, time_end, subject FROM schedules 
+     WHERE teacher_id = ? AND (day_of_week = ? OR (? = 'full_time' AND day_of_week IS NULL))
      ORDER BY time_start ASC`,
-    [teacher.id, dayOfWeek],
+    [teacher.id, dayOfWeek, teacher.teacher_type],
   )
 
+  if (schedules.length === 0) {
+    return res.status(400).json({ message: 'No schedule found for this teacher today' })
+  }
 
   // Check if both time_in and time_out already exist for today
   const todayScans = await query(
-    `SELECT scan_type FROM attendance 
+    `SELECT scan_type, schedule_id FROM attendance
      WHERE teacher_id = ? AND DATE(scan_time) = ?
      ORDER BY scan_time DESC`,
     [teacher.id, todayDate],
   )
-
-  const hasTimeIn = todayScans.some(s => s.scan_type === 'time_in')
-  const hasTimeOut = todayScans.some(s => s.scan_type === 'time_out')
-  if (hasTimeIn && hasTimeOut) {
-    return res.status(400).json({
-      message: 'Attendance already recorded for today (time in and out)',
-    })
-  }
-
-  let scanType = 'time_in'
-  if (todayScans.length > 0) {
-    // If last scan was time_in, this should be time_out
-    scanType = todayScans[0].scan_type === 'time_in' ? 'time_out' : 'time_in'
-  }
-
-  // Determine status (on_time or late)
-  let status = 'on_time'
 
   let schedule = selectSchedule(currentTime, schedules)
 
@@ -407,21 +444,38 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
     schedule = match
   }
 
-  if (scanType === 'time_in' && schedule) {
-    const currentMinutes = timeToMinutes(currentTime)
-    const scheduleStartMinutes = timeToMinutes(schedule.time_start)
-    const graceMinutes = teacher.teacher_type === 'full_time' ? 0 : lateGraceMinutes
-
-    if (currentMinutes > scheduleStartMinutes + graceMinutes) {
-      status = 'late'
-    }
+  const scheduleScans = todayScans.filter((scan) => scan.schedule_id === schedule.id)
+  const hasTimeIn = scheduleScans.some(s => s.scan_type === 'time_in')
+  const hasTimeOut = scheduleScans.some(s => s.scan_type === 'time_out')
+  if (teacher.teacher_type === 'part_time' && hasTimeIn) {
+    return res.status(400).json({
+      message: 'Attendance already recorded for this part-time schedule today',
+    })
   }
+
+  if (hasTimeIn && hasTimeOut) {
+    return res.status(400).json({
+      message: 'Attendance already recorded for this schedule today (time in and out)',
+    })
+  }
+
+  let scanType = 'time_in'
+  if (scheduleScans.length > 0) {
+    scanType = scheduleScans[0].scan_type === 'time_in' ? 'time_out' : 'time_in'
+  }
+
+  const scheduleValidation = getScheduleValidation(teacher.teacher_type, schedule, currentTime, scanType)
+  if (scheduleValidation.error) {
+    return res.status(400).json({ message: scheduleValidation.error })
+  }
+
+  const status = getAttendanceStatus(teacher.teacher_type, schedule, currentTime, scanType)
 
   // Insert the attendance record
   await query(
     `INSERT INTO attendance (teacher_id, schedule_id, scan_time, scan_type, status)
      VALUES (?, ?, ?, ?, ?)`,
-    [teacher.id, schedule?.id || null, currentDateTime, scanType, status],
+    [teacher.id, schedule.id, currentDateTime, scanType, status],
   )
 
   return res.status(201).json({
@@ -435,7 +489,7 @@ attendanceRouter.post('/scan', authorizeRoles('admin'), async (req, res) => {
       scan_time: currentDateTime,
       status,
       schedule: schedule
-        ? { time_start: schedule.time_start, time_end: schedule.time_end }
+        ? { id: schedule.id, day_of_week: schedule.day_of_week, time_start: schedule.time_start, time_end: schedule.time_end, subject: schedule.subject }
         : null,
     },
   })
