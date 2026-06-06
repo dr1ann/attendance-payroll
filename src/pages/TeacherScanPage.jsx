@@ -57,6 +57,7 @@ export default function TeacherScanPage() {
   const html5QrCodeRef = useRef(null)
   const scanFlowActiveRef = useRef(false)
   const lastScanRef = useRef({ value: '', scannedAt: 0 })
+  const handleScanFlowRef = useRef(null)
 
   const stopScanner = useCallback(async () => {
     if (html5QrCodeRef.current?.isScanning) {
@@ -194,6 +195,10 @@ export default function TeacherScanPage() {
     [loadSchedulesForToday, processScan],
   )
 
+  // Keep the ref in sync with the latest handleScanFlow so the running scanner
+  // always calls the most up-to-date version (avoids stale closure inside html5-qrcode).
+  handleScanFlowRef.current = handleScanFlow
+
   const startScanner = useCallback(async () => {
     if (!scannerRef.current) return
 
@@ -209,7 +214,9 @@ export default function TeacherScanPage() {
         { facingMode: 'environment' },
         SCANNER_CONFIG,
         (decodedText) => {
-          handleScanFlow(decodedText)
+          // Delegate through the ref so we always call the latest handleScanFlow
+          // regardless of when the scanner callback was first registered.
+          handleScanFlowRef.current?.(decodedText)
         },
         () => {
           // Ignore per-frame scan errors (no QR found)
@@ -220,7 +227,7 @@ export default function TeacherScanPage() {
     } catch (err) {
       setError(`Camera error: ${err.message || 'Unable to access camera'}`)
     }
-  }, [handleScanFlow])
+  }, [])
 
   useEffect(() => {
     return () => {
